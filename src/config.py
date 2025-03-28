@@ -1,9 +1,9 @@
-import os
-
 from pydantic_settings import BaseSettings
 
+from vault.vault_settings import *
 
-class Config(BaseSettings):
+
+class DatabaseConfig(BaseSettings):
     DATABASE_HOST: str
     DATABASE_PORT: int
     DATABASE_USER: str
@@ -11,7 +11,7 @@ class Config(BaseSettings):
     DATABASE_DB: str
 
 
-settings = Config(
+database_settings = DatabaseConfig(
     DATABASE_HOST=os.getenv("DATABASE_HOST"),
     DATABASE_PORT=int(os.getenv("DATABASE_PORT")),
     DATABASE_USER=os.getenv("DATABASE_USER"),

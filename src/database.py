@@ -1,20 +1,41 @@
-from sqlalchemy import create_engine
+import importlib.util
+import os
+from pathlib import Path
+
+from sqlalchemy.ext.asyncio import (AsyncSession, async_sessionmaker,
+                                    create_async_engine)
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-from src.config import settings
 
-SQLALCHEMY_DATABASE_URL = f"postgresql+asyncpg://{settings.DATABASE_USER}:{settings.DATABASE_PASSWORD}@{settings.DATABASE_HOST}:{settings.DATABASE_PORT}/{settings.DATABASE_DB}"
+from src.config import database_settings
 
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
+SQLALCHEMY_DATABASE_URL = f"postgresql+asyncpg://{database_settings.DATABASE_USER}:{database_settings.DATABASE_PASSWORD}@{database_settings.DATABASE_HOST}:{database_settings.DATABASE_PORT}/{database_settings.DATABASE_DB}"
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+engine = create_async_engine(SQLALCHEMY_DATABASE_URL, echo=True)
+
+async_session_maker = async_sessionmaker(
+    engine, class_=AsyncSession, expire_on_commit=False
+)
 
 Base = declarative_base()
 
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+async def get_db():
+    async with async_session_maker() as session:
+        yield session
+
+
+def import_all_models() -> None:
+    """Used by extra tools (such as alembic) to detect all models"""
+
+    base_dir = Path(__file__).resolve().parent
+    for root, dirs, files in os.walk(base_dir):
+        if "models.py" in files:
+            module_path = os.path.join(root, "models.py")
+            module_name = (
+                os.path.relpath(module_path, base_dir)
+                .replace(os.sep, ".")
+                .replace(".py", "")
+            )
+            spec = importlib.util.spec_from_file_location(module_name, module_path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)

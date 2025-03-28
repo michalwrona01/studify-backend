@@ -1,12 +1,12 @@
-from sqlalchemy.orm import Mapped, DeclarativeBase
-from sqlalchemy.testing.schema import mapped_column
+from typing import Optional
+
+from sqlalchemy import Column, Integer, String
+from sqlalchemy.orm import Mapped, mapped_column
+
+from src.models import BaseModel
 
 
-class Base(DeclarativeBase):
-    pass
+class Schedule(BaseModel):
+    __tablename__ = "schedule"
 
-
-class Post(Base):
-    __tablename__ = "posts"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[Optional[str]] = mapped_column(String(255))

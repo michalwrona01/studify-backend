@@ -1,17 +1,9 @@
-from fastapi import Depends, FastAPI
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import FastAPI
 
-from src.database import get_db
+from src.config import settings
+from src.health_check.router import router as health_check
 
-app = FastAPI()
+app = FastAPI(title="Studify API", root_path="/api", debug=settings.DEBUG)
 
 
-@app.get("/health-check")
-async def health_check(db: AsyncSession = Depends(get_db)):
-    try:
-        await db.execute(select(1))
-    except Exception as e:
-        return {"status": "error", "details": str(e)}
-    else:
-        return {"status": "ok"}
+app.include_router(health_check)

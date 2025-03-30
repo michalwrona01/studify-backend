@@ -21,18 +21,6 @@ services:
     volumes:
       - pgadmin_data:/var/lib/pgadmin
 
-#  vault:
-#    build: .
-#    container_name: vault
-#    ports:
-#      - "8200:8200"
-#    cap_add:
-#      - IPC_LOCK
-#    environment:
-#      VAULT_DEV_ROOT_TOKEN_ID: "root"
-#      VAULT_ADDR: "http://127.0.0.1:8200"
-
-
 volumes:
   postgres_data:
   pgadmin_data:

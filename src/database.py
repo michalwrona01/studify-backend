@@ -5,7 +5,6 @@ from pathlib import Path
 from sqlalchemy.ext.asyncio import (AsyncSession, async_sessionmaker,
                                     create_async_engine)
 from sqlalchemy.ext.declarative import declarative_base
-
 from src.config import database_settings
 
 SQLALCHEMY_DATABASE_URL = f"postgresql+asyncpg://{database_settings.DATABASE_USER}:{database_settings.DATABASE_PASSWORD}@{database_settings.DATABASE_HOST}:{database_settings.DATABASE_PORT}/{database_settings.DATABASE_DB}"

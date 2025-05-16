@@ -1,8 +1,7 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, DateTime, Integer, String
+from sqlalchemy import Column, DateTime, Integer
 from sqlalchemy.orm import Mapped, mapped_column
-
 from src.database import Base
 
 
@@ -12,10 +11,12 @@ class BaseModel(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
     modified_at: Mapped[datetime] = mapped_column(
-        DateTime,
+        DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
     )
     created_at: Mapped[datetime] = Column(
-        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
     )

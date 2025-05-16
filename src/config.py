@@ -1,5 +1,4 @@
 from pydantic_settings import BaseSettings
-
 from vault.vault_settings import *
 
 

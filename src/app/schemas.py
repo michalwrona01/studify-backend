@@ -1,9 +1,20 @@
+from datetime import date
+from typing import Any, Dict
+
 from pydantic import BaseModel
 
 
 class ScheduleCreate(BaseModel):
-    name: str = None
+    date: date
+    day_of_week: str
+    group: str
+    section: int
+    mode: str
+    hours: Dict[str, Any] = {}
+
+    class Config:
+        from_attributes = True
 
 
-class ScheduleUpdate(ScheduleCreate):
+class ScheduleResponse(ScheduleCreate):
     id: int

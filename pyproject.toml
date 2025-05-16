@@ -17,10 +17,28 @@ dependencies = [
     "sqlalchemy[asyncio] (>=2.0.39,<3.0.0)",
     "hvac (>=2.3.0,<3.0.0)",
     "black (>=25.1.0,<26.0.0)",
-    "isort (>=6.0.1,<7.0.0)"
+    "isort (>=6.0.1,<7.0.0)",
+    "ics (>=0.7.2,<0.8.0)"
 ]
 
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 120
+target-version = ['py313']
+skip-string-normalization = false
+skip-magic-trailing-comma = false
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+  | \.mypy_cache
+  | \.venv
+  | build
+  | dist
+)/
+'''
+

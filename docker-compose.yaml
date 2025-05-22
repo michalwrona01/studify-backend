@@ -12,15 +12,5 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  pg-admin:
-    image: dpage/pgadmin4
-    ports:
-      - "8888:80"
-    env_file:
-      - ../environment/local/backend/pg-admin.env
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
-
 volumes:
   postgres_data:
-  pgadmin_data:

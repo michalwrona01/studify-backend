@@ -1,5 +1,3 @@
-version: "3"
-
 services:
   studify-db:
     image: postgres:17

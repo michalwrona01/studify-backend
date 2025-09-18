@@ -1,0 +1,17 @@
+version: "3"
+
+services:
+  backend:
+    build: ../backend
+    container_name: studify-backend
+    restart: always
+    env_file:
+      - ../environment/prod/backend/db.env
+    ports:
+      - "80:8080"
+    networks:
+      - mikrus-net
+
+networks:
+  mikrus-net:
+    external: true

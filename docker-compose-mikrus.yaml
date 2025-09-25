@@ -1,10 +1,10 @@
 services:
   backend:
-    build: ../backend
+    build: .
     container_name: studify-backend
     restart: always
     env_file:
-      - ../environment/prod/backend/db.env
+      - ../environment/prod/backend/backend.env
     ports:
       - "80:8080"
     networks:

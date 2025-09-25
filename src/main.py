@@ -91,6 +91,3 @@ async def ical_export(section: int = 1, db: AsyncSession = Depends(get_db)):
             "Content-Disposition": f"attachment; filename=plan_zajec_lekarski_as_sekcja_{section}.ics"
         },
     )
-
-
-app.include_router(health_check)

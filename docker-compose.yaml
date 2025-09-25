@@ -10,5 +10,14 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  backend:
+    build: .
+    container_name: studify-backend
+    restart: always
+    env_file:
+      - ../environment/local/backend/backend.env
+    ports:
+      - "8080:8080"
+
 volumes:
   postgres_data:

@@ -2,19 +2,28 @@ from datetime import datetime
 from typing import List
 from zoneinfo import ZoneInfo
 
-from fastapi import Depends, FastAPI, Response
+from fastapi import Depends, FastAPI, Response, Request
 from ics import Calendar, Event
 from ics.component import Component
 from sqlalchemy import delete, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse
+
 from src.app.models import Schedule
 from src.app.schemas import ScheduleCreate
 from src.config import settings
 from src.database import get_db
-from src.health_check.router import router as health_check
 
 app = FastAPI(title="Studify API", root_path="/api", debug=settings.DEBUG)
 
+templates = Jinja2Templates(directory="templates")
+
+@app.get("/", response_class=HTMLResponse)
+async def read_item(request: Request):
+    return templates.TemplateResponse(
+        request=request, name="index.html"
+    )
 
 @app.post("/schedules", response_model=ScheduleCreate)
 async def schedule_create(

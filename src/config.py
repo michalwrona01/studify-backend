@@ -1,9 +1,6 @@
-import os
-
 from pydantic_settings import BaseSettings
 
-if bool(int(os.getenv("USE_VALUT", "1"))):
-    from vault.vault_settings import *
+from vault.vault_settings import *
 
 
 class DatabaseConfig(BaseSettings):

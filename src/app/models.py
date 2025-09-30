@@ -4,6 +4,12 @@ from sqlalchemy.orm import Mapped, mapped_column
 from src.models import BaseModel
 
 
+class ScheduleFile(BaseModel):
+    __tablename__ = "schedules_files"
+
+    md5_hash: Mapped[str] = mapped_column(String(32), nullable=False)
+
+
 class Schedule(BaseModel):
     __tablename__ = "schedules"
 

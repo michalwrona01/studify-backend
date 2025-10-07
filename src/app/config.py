@@ -22,7 +22,7 @@ class ScheduleMailConfig(BaseSettings):
 
 
 schedule_mail_config = ScheduleMailConfig(
-    MAILS_TO="wronamichal01@gmail.com",
+    MAILS_TO=os.getenv("MAILS_TO"),
     MAIL_SUBJECT="Aktualizacja planu zajęć - AŚ - Lekarski semestr 7",
     MAIL_BODY="""<p>Witaj, nastąpiła zmiana w planie zajęć.</p>
         <p>Powodzenia!</p>

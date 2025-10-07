@@ -37,26 +37,25 @@ class ScheduleService:
             aggregated = []
             current_range = None
 
-            for time_range, description in entries:
+            for time_range, subject in entries:
                 start, end = time_range.split("-")
                 if not current_range:
-                    current_range = {"start": start, "end": end, "desc": description}
-                elif current_range["desc"] == description and current_range["end"] == start:
+                    current_range = {"start": start, "end": end, "name": subject.get("name", ""), "uid": subject.get("uid", "")}
+                elif current_range["name"] == subject.get("name", "") and current_range["end"] == start:
                     current_range["end"] = end
                 else:
                     aggregated.append(
                         (
                             f"{current_range['start']}-{current_range['end']}",
-                            current_range["desc"],
+                            dict(name=current_range["name"], uid=current_range["uid"])
                         )
                     )
-                    current_range = {"start": start, "end": end, "desc": description}
+                    current_range = {"start": start, "end": end, "name": subject.get("name", ""), "uid": subject.get("uid", "")}
 
             if current_range:
                 aggregated.append(
                     (
-                        f"{current_range['start']}-{current_range['end']}",
-                        current_range["desc"],
+                        f"{current_range['start']}-{current_range['end']}", dict(name=current_range["name"], uid=current_range["uid"])
                     )
                 )
 

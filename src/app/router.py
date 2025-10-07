@@ -49,8 +49,6 @@ async def ical_export(section: int = 1, db: AsyncSession = Depends(get_db)):
     serialized_data = ScheduleService.serialize_calendar(calendar=calendar)
 
     last_modified = await selector.get_last_modified_by_section(section=section)
-
-    serialized_data = ""
     
     return Response(
         content=serialized_data,

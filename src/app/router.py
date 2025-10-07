@@ -49,7 +49,7 @@ async def ical_export(section: int = 1, db: AsyncSession = Depends(get_db)):
     serialized_data = ScheduleService.serialize_calendar(calendar=calendar)
 
     last_modified = await selector.get_last_modified_by_section(section=section)
-    
+
     return Response(
         content=serialized_data,
         media_type="text/calendar; charset=utf-8",

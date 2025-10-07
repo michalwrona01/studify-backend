@@ -1,5 +1,5 @@
 import hashlib
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Union
 from zoneinfo import ZoneInfo
 
@@ -40,22 +40,39 @@ class ScheduleService:
             for time_range, subject in entries:
                 start, end = time_range.split("-")
                 if not current_range:
-                    current_range = {"start": start, "end": end, "name": subject.get("name", ""), "uid": subject.get("uid", "")}
-                elif current_range["name"] == subject.get("name", "") and current_range["end"] == start:
+                    current_range = {
+                        "start": start,
+                        "end": end,
+                        "name": subject.get("name", ""),
+                        "uid": subject.get("uid", ""),
+                    }
+                elif current_range["name"] == subject.get("name", "") and (
+                    current_range["end"] == start
+                    or (
+                        (datetime.strptime(current_range["end"], "%H:%M") + timedelta(minutes=5)).time()
+                        == datetime.strptime(start, "%H:%M").time()
+                    )
+                ):
                     current_range["end"] = end
                 else:
                     aggregated.append(
                         (
                             f"{current_range['start']}-{current_range['end']}",
-                            dict(name=current_range["name"], uid=current_range["uid"])
+                            dict(name=current_range["name"], uid=current_range["uid"]),
                         )
                     )
-                    current_range = {"start": start, "end": end, "name": subject.get("name", ""), "uid": subject.get("uid", "")}
+                    current_range = {
+                        "start": start,
+                        "end": end,
+                        "name": subject.get("name", ""),
+                        "uid": subject.get("uid", ""),
+                    }
 
             if current_range:
                 aggregated.append(
                     (
-                        f"{current_range['start']}-{current_range['end']}", dict(name=current_range["name"], uid=current_range["uid"])
+                        f"{current_range['start']}-{current_range['end']}",
+                        dict(name=current_range["name"], uid=current_range["uid"]),
                     )
                 )
 

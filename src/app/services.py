@@ -1,19 +1,28 @@
 import hashlib
 from datetime import datetime
-from typing import List
+from typing import Dict, List, Optional, Union
 from zoneinfo import ZoneInfo
 
-from fastapi import Depends, File, UploadFile
+from fastapi import UploadFile
+from fastapi_mail import ConnectionConfig, FastMail, MessageSchema, MessageType
 from ics import Calendar, Event
 from ics.component import Component
+from pydantic import EmailStr
+from sqlalchemy import delete, insert, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.models import Schedule, ScheduleFile
+from src.app.schemas import ScheduleCreate
 from src.app.selectors import ScheduleFileSelector
-from src.database import get_db
 
 
 class ScheduleService:
+
+    @staticmethod
+    async def delete_and_create_schedules(schedules: List[ScheduleCreate], db: AsyncSession):
+        async with db.begin():
+            await db.execute(delete(Schedule))
+            await db.execute(insert(Schedule), [s.model_dump() for s in schedules])
 
     @staticmethod
     def create_calendar(schedules: List[Schedule]) -> Calendar:
@@ -59,7 +68,8 @@ class ScheduleService:
                 end_time = datetime.strptime(end_time_str, "%H:%M").time()
                 event.begin = datetime.combine(schedule.date, start_time, tzinfo=ZoneInfo("Europe/Warsaw"))
                 event.end = datetime.combine(schedule.date, end_time, tzinfo=ZoneInfo("Europe/Warsaw"))
-                event.name = subject
+                event.name = subject.get("name", "")
+                event.uid = subject.get("uid", "")
                 calendar.events.add(event)
 
         return calendar
@@ -72,31 +82,40 @@ class ScheduleService:
 class ScheduleFileService:
 
     @staticmethod
-    async def create_or_update_schedule(db: AsyncSession, file: UploadFile):
+    async def create_or_update_md5_file(*, file: UploadFile, db: AsyncSession) -> bool:
+        """Returns boolean whether I should send an email"""
+        schedule_file_selector = ScheduleFileSelector(db=db)
+
         content_file = await file.read()
         md5_hash = hashlib.md5(content_file).hexdigest()
 
-        old_schedule = await ScheduleFileSelector(db=db).get_last_schedule_file()
+        schedule_file = await schedule_file_selector.get_last_schedule_file()
 
-        if not old_schedule:
-            db_schedule = ScheduleFile(md5_hash=md5_hash)
-            db.add(db_schedule)
-            try:
-                await db.commit()
-                await db.refresh(db_schedule)
-                return db_schedule, True
-            except Exception:
-                await db.rollback()
-                raise
+        if not schedule_file:
+            await db.execute(insert(ScheduleFile).values(md5_hash=md5_hash))
+            return True
 
-        if old_schedule.md5_hash != md5_hash:
-            old_schedule.md5_hash = md5_hash
-            try:
-                await db.commit()
-                await db.refresh(old_schedule)
-                return old_schedule, True
-            except Exception:
-                await db.rollback()
-                raise
+        if schedule_file and schedule_file.md5_hash != md5_hash:
+            await db.execute(update(ScheduleFile).where(ScheduleFile.id == schedule_file.id).values(md5_hash=md5_hash))
+            return True
 
-        return old_schedule, False
+        return False
+
+
+class SMTPService:
+    def __init__(self, config: ConnectionConfig):
+        self.client = FastMail(config=config)
+
+    async def send_mail(
+        self,
+        recipients: List[EmailStr],
+        subject: str = "",
+        body: Optional[Union[str, list]] = None,
+        subtype: MessageType = "html",
+        attachments: List[Union[UploadFile, Dict, str]] = None,
+    ) -> bool:
+        message = MessageSchema(
+            subject=subject, recipients=recipients, body=body, subtype=subtype, attachments=attachments
+        )
+        await self.client.send_message(message)
+        return True

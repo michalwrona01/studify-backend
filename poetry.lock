@@ -709,6 +709,25 @@ requests = ">=2.27.1,<3.0.0"
 parser = ["pyhcl (>=0.4.4,<0.5.0)"]
 
 [[package]]
+name = "icalendar"
+version = "6.3.1"
+description = "iCalendar parser/generator"
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "icalendar-6.3.1-py3-none-any.whl", hash = "sha256:7ea1d1b212df685353f74cdc6ec9646bf42fa557d1746ea645ce8779fdfbecdd"},
+    {file = "icalendar-6.3.1.tar.gz", hash = "sha256:a697ce7b678072941e519f2745704fc29d78ef92a2dc53d9108ba6a04aeba466"},
+]
+
+[package.dependencies]
+python-dateutil = "*"
+tzdata = "*"
+
+[package.extras]
+test = ["coverage", "hypothesis", "pytest", "pytz"]
+
+[[package]]
 name = "ics"
 version = "0.7.2"
 description = "Python icalendar (rfc5545) parser"
@@ -1762,7 +1781,6 @@ description = "Provider of IANA time zone data"
 optional = false
 python-versions = ">=2"
 groups = ["main"]
-markers = "sys_platform == \"win32\""
 files = [
     {file = "tzdata-2025.2-py2.py3-none-any.whl", hash = "sha256:1a403fada01ff9221ca8044d701868fa132215d84beb92242d9acd2147f667a8"},
     {file = "tzdata-2025.2.tar.gz", hash = "sha256:b60a638fcc0daffadf82fe0f57e53d06bdec2f36c4df66280ae79bce6bd6f2b9"},
@@ -2119,4 +2137,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.13"
-content-hash = "6dbeb08ceffffd5b60dfd65f99bfe9ff982713f287c3f25d29197ae8d0bed1ae"
+content-hash = "b38b632b09c56f1115a3caae665d937f72b6164c7faf19814660bc9eef62ae5e"

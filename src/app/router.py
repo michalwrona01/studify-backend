@@ -45,13 +45,12 @@ async def ical_export(section: int = 1, db: AsyncSession = Depends(get_db)):
     schedules_list = [ScheduleResponse.model_validate(s).model_dump() for s in schedules]
     etag = md5(str(schedules_list).encode()).hexdigest()
 
-    calendar = ScheduleService.create_calendar(schedules=schedules)
-    serialized_data = ScheduleService.serialize_calendar(calendar=calendar)
+    calendar_data = ScheduleService().create_calendar(schedules=schedules, calendar_package="icalendar")
 
     last_modified = await selector.get_last_modified_by_section(section=section)
 
     return Response(
-        content=serialized_data,
+        content=calendar_data,
         media_type="text/calendar; charset=utf-8",
         headers={
             "Content-Disposition": f"attachment; filename=plan_zajec_lekarski_as_sekcja_{section}.ics",

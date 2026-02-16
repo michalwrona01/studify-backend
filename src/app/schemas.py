@@ -8,7 +8,7 @@ class ScheduleCreate(BaseModel):
     date: date
     day_of_week: str
     group: str
-    section: int
+    section: str
     mode: str
     hours: Dict[str, Any] = {}
 

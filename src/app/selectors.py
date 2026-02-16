@@ -13,11 +13,11 @@ class ScheduleSelector(BaseSelector):
         result = await self._db.execute(select(Schedule).where(Schedule.id == object_id).limit(1))
         return result.scalars().first()
 
-    async def get_by_section(self, *, section: int, order_by):
+    async def get_by_section(self, *, section: str, order_by):
         result = await self._db.execute(select(Schedule).where(Schedule.section == section).order_by(order_by))
         return result.scalars().all()
 
-    async def get_last_modified_by_section(self, *, section: int):
+    async def get_last_modified_by_section(self, *, section: str):
         result = await self._db.execute(
             select(Schedule.modified_at)
             .where(Schedule.section == section)

@@ -16,6 +16,6 @@ class Schedule(BaseModel):
     date = mapped_column(Date, nullable=False)
     day_of_week: Mapped[str] = mapped_column(String(31), nullable=False)
     group: Mapped[str] = mapped_column(String(15), nullable=False)
-    section: Mapped[int] = mapped_column(Integer, nullable=False)
+    section: Mapped[str] = mapped_column(String(15), nullable=False)
     mode: Mapped[str] = mapped_column(String(15), nullable=False)
     hours: Mapped[JSON] = mapped_column(JSON, nullable=False)

@@ -22,6 +22,7 @@ templates = Jinja2Templates(directory="templates")
 async def home_page(request: Request, db: AsyncSession = Depends(get_db)):
     schedules = await ScheduleSelector(db=db).get_distinct_by(Schedule.section)
     sections = [schedule.section for schedule in schedules]
+    sections = sorted(sections, key=lambda x: int(''.join(filter(str.isdigit, x))))
     return templates.TemplateResponse(
         request=request, name="index.html", context={"sections": sections, "host": request.headers.get("host")}
     )

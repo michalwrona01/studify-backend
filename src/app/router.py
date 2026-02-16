@@ -38,7 +38,7 @@ async def schedule_create(schedules: List[ScheduleCreate], db: AsyncSession = De
 
 
 @router.get("/plan_zajec_lekarski_as.ics")
-async def ical_export(section: int = 1, db: AsyncSession = Depends(get_db)):
+async def ical_export(section: str = "1", db: AsyncSession = Depends(get_db)):
     selector = ScheduleSelector(db=db)
 
     schedules = await selector.get_by_section(section=section, order_by=Schedule.date.asc())

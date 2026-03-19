@@ -1,8 +1,11 @@
+from datetime import datetime
 from hashlib import md5
 from typing import List
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Response, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.templating import Jinja2Templates
 
 from src.app.config import schedule_mail_config, smtp_config
 from src.app.models import Schedule
@@ -12,7 +15,7 @@ from src.app.services import ScheduleFileService, ScheduleService, SMTPService
 from src.database import get_db
 
 router = APIRouter(prefix="/api")
-
+templates = Jinja2Templates(directory="templates")
 
 @router.post("/schedules/files")
 async def schedule_file_md5_update_and_send_mail(file: UploadFile, db: AsyncSession = Depends(get_db)):
@@ -23,8 +26,8 @@ async def schedule_file_md5_update_and_send_mail(file: UploadFile, db: AsyncSess
         smtp_client = SMTPService(config=smtp_config)
         await smtp_client.send_mail(
             recipients=schedule_mail_config.MAILS_TO.split(","),
-            subject=schedule_mail_config.MAIL_SUBJECT,
-            body=schedule_mail_config.MAIL_BODY,
+            subject=f"{schedule_mail_config.MAIL_SUBJECT} - {datetime.now(tz=ZoneInfo("Europe/Warsaw"))}",
+            body=templates.get_template("mail.html").render(),
             attachments=[file],
         )
 

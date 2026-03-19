@@ -1,6 +1,5 @@
 from fastapi_mail import ConnectionConfig
 from pydantic_settings import BaseSettings
-from datetime import datetime
 
 from vault.vault_settings import *
 
@@ -24,7 +23,7 @@ class ScheduleMailConfig(BaseSettings):
 
 schedule_mail_config = ScheduleMailConfig(
     MAILS_TO=os.getenv("MAILS_TO"),
-    MAIL_SUBJECT=f"Aktualizacja planu zajęć - AŚ - {os.getenv("FILE_NAME")} - {datetime.now()}",
+    MAIL_SUBJECT=f"Aktualizacja planu zajęć - AŚ - {os.getenv("FILE_NAME")}",
     MAIL_BODY="""<p>Cześć, nastąpiła zmiana w planie zajęć.</p>
         <p>Powodzenia!</p>
         <br>

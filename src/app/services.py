@@ -98,7 +98,7 @@ class ICalendarService(CalendarBaseService):
                     )
 
                 # ALARM before 15 mins ""
-                if "wykład" in subject.get("name", ""):
+                if "wykład" in subject.get("name", "").lower():
                     alarm = iAlarm()
                     alarm.add("action", "DISPLAY")
                     alarm.add("description", f"Przypomnienie: {subject.get("name", "")}")

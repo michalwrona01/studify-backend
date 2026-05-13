@@ -8,6 +8,7 @@ from fastapi import UploadFile
 from fastapi_mail import ConnectionConfig, FastMail, MessageSchema, MessageType
 from icalendar import Calendar as iCalendar
 from icalendar import Event as iEvent
+from icalendar import Alarm as iAlarm
 from icalendar import vText
 from ics import Calendar as ICSCalendar
 from ics import Event as ICSEvent
@@ -60,9 +61,6 @@ class ICalendarService(CalendarBaseService):
 
         for day in schedules:
             for hours, subject in day.items():
-                event = iEvent()
-                calendar.add_component(event)
-
                 start_time_str, end_time_str = hours.split("-")
                 start_time = datetime.strptime(start_time_str, "%H:%M").time()
                 end_time = datetime.strptime(end_time_str, "%H:%M").time()
@@ -99,6 +97,13 @@ class ICalendarService(CalendarBaseService):
                         },
                     )
 
+                # ALARM before 15 mins
+                alarm = iAlarm()
+                alarm.add("action", "DISPLAY")
+                alarm.add("description", f"Przypomnienie: {subject.get("name", "")}")
+                alarm.add("trigger", timedelta(minutes=-15))
+
+                event.add_component(alarm)
                 calendar.add_component(event)
 
         ical_bytes = calendar.to_ical()

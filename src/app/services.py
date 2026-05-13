@@ -103,6 +103,8 @@ class ICalendarService(CalendarBaseService):
                     alarm.add("action", "DISPLAY")
                     alarm.add("description", f"Przypomnienie: {subject.get("name", "")}")
                     alarm.add("trigger", timedelta(minutes=-30))
+                    alarm.add("repeat", 2)
+                    alarm.add("duration", timedelta(minutes=15))
                     event.add_component(alarm)
 
                 calendar.add_component(event)

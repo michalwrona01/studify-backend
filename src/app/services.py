@@ -99,7 +99,7 @@ class ICalendarService(CalendarBaseService):
 
                 # ALARM before 15 mins ""
                 if "wykład" in subject.get("name", "").lower():
-                    for minutes in [-30, -10]:
+                    for minutes in [-10, -30]:
                         alarm = iAlarm()
                         alarm.add("action", "DISPLAY")
                         alarm.add("description", f"Przypomnienie: Za {abs(minutes)} minut zacznie się {subject.get("name", "")}")

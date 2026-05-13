@@ -97,13 +97,14 @@ class ICalendarService(CalendarBaseService):
                         },
                     )
 
-                # ALARM before 15 mins
-                alarm = iAlarm()
-                alarm.add("action", "DISPLAY")
-                alarm.add("description", f"Przypomnienie: {subject.get("name", "")}")
-                alarm.add("trigger", timedelta(minutes=-15))
+                # ALARM before 15 mins ""
+                if "wykład" in subject.get("name", ""):
+                    alarm = iAlarm()
+                    alarm.add("action", "DISPLAY")
+                    alarm.add("description", f"Przypomnienie: {subject.get("name", "")}")
+                    alarm.add("trigger", timedelta(minutes=-30))
+                    event.add_component(alarm)
 
-                event.add_component(alarm)
                 calendar.add_component(event)
 
         ical_bytes = calendar.to_ical()

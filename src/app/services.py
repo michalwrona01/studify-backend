@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.models import Schedule, ScheduleFile
 from src.app.schemas import ScheduleCreate
-from src.app.selectors import ScheduleFileSelector
+from src.app.models_selectors import ScheduleFileSelector
 
 
 class CalendarBaseService(ABC):

@@ -6,7 +6,7 @@ from starlette.staticfiles import StaticFiles
 
 from src.app.models import Schedule
 from src.app.router import router as app_router
-from src.app.selectors import ScheduleSelector
+from src.app.models_selectors import ScheduleSelector
 from src.config import settings
 from src.database import get_db
 from src.health_check.router import router as health_check_router

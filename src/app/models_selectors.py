@@ -1,7 +1,7 @@
 from sqlalchemy import select
 
 from src.app.models import Schedule, ScheduleFile
-from src.selectors import BaseSelector
+from src.base_selectors import BaseSelector
 
 
 class ScheduleSelector(BaseSelector):

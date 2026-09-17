@@ -7,10 +7,11 @@ from fastapi import APIRouter, Depends, Response, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.templating import Jinja2Templates
 
+from src.config import settings
 from src.app.config import schedule_mail_config, smtp_config
 from src.app.models import Schedule
 from src.app.schemas import ScheduleCreate, ScheduleResponse
-from src.app.selectors import ScheduleSelector
+from src.app.models_selectors import ScheduleSelector
 from src.app.services import ScheduleFileService, ScheduleService, SMTPService
 from src.database import get_db
 
@@ -19,10 +20,10 @@ templates = Jinja2Templates(directory="templates")
 
 @router.post("/schedules/files")
 async def schedule_file_md5_update_and_send_mail(file: UploadFile, db: AsyncSession = Depends(get_db)):
-    is_send_mail = await ScheduleFileService.create_or_update_md5_file(file=file, db=db)
+    is_send_notifications = await ScheduleFileService.create_or_update_md5_file(file=file, db=db)
     await file.seek(0)
 
-    if is_send_mail:
+    if is_send_notifications and settings.IS_EMAILS_SEND:
         smtp_client = SMTPService(config=smtp_config)
         await smtp_client.send_mail(
             recipients=schedule_mail_config.MAILS_TO.split(","),
@@ -31,7 +32,7 @@ async def schedule_file_md5_update_and_send_mail(file: UploadFile, db: AsyncSess
             attachments=[file],
         )
 
-    return {"is_email_sent": is_send_mail}
+    return {"is_email_sent": is_send_notifications}
 
 
 @router.post("/schedules", response_model=List[ScheduleCreate])

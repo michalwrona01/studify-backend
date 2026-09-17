@@ -52,7 +52,7 @@ class ICalendarService(CalendarBaseService):
     def serialize_calendar(schedules: List[Dict]) -> str:
         calendar = iCalendar()
 
-        calendar.add("prodid", "-//Lekarski//Semestr//8//PL")
+        calendar.add("prodid", "-//Lekarski//Semestr//9//PL")
         calendar.add("version", "2.0")
         calendar.add("calscale", "GREGORIAN")
         calendar.add("method", "PUBLISH")

@@ -42,14 +42,14 @@ async def schedule_create(schedules: List[ScheduleCreate], db: AsyncSession = De
 
 
 @router.get("/plan_zajec_lekarski_as.ics")
-async def ical_export(section: str = "1", db: AsyncSession = Depends(get_db)):
+async def ical_export(section: str = "1", db: AsyncSession = Depends(get_db), events_type: str = "inperson"):
     selector = ScheduleSelector(db=db)
 
     schedules = await selector.get_by_section(section=section, order_by=Schedule.date.asc())
     schedules_list = [ScheduleResponse.model_validate(s).model_dump() for s in schedules]
     etag = md5(str(schedules_list).encode()).hexdigest()
 
-    calendar_data = ScheduleService().create_calendar(schedules=schedules, calendar_package="icalendar")
+    calendar_data = ScheduleService().create_calendar(schedules=schedules, events_type=events_type, section=section, calendar_package="icalendar")
 
     last_modified = await selector.get_last_modified_by_section(section=section)
 

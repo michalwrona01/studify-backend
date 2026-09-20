@@ -1,4 +1,5 @@
 import hashlib
+import os
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Union
@@ -24,13 +25,13 @@ from src.app.models_selectors import ScheduleFileSelector
 class CalendarBaseService(ABC):
     @staticmethod
     @abstractmethod
-    def serialize_calendar(schedules: List[Dict]) -> str:
+    def serialize_calendar(schedules: List[Dict], events_type: str, section: str) -> str:
         pass
 
 
 class ICSService(CalendarBaseService):
     @staticmethod
-    def serialize_calendar(schedules: List[Dict]) -> str:
+    def serialize_calendar(schedules: List[Dict], events_type: str, section: str) -> str:
         calendar = ICSCalendar()
         for day in schedules:
             for hours, subject in day.items():
@@ -49,11 +50,26 @@ class ICSService(CalendarBaseService):
 
 class ICalendarService(CalendarBaseService):
     @staticmethod
-    def serialize_calendar(schedules: List[Dict]) -> str:
+    def serialize_calendar(schedules: List[Dict], events_type: str, section: str) -> str:
         calendar = iCalendar()
 
-        calendar.add("prodid", "-//Lekarski//Semestr//9//PL")
+        calendar.add("prodid", f"-//{os.getenv("FILE_NAME", "").replace(" ", "//")}//PL")
         calendar.add("version", "2.0")
+
+        match events_type:
+            case "inperson":
+                calendar.add("name", f"Plan zajęć AŚ - {os.getenv("FILE_NAME")} - Sekcja {section} - Stacjonarne")
+                calendar.add("X-WR-CALNAME", f"Plan zajęć AŚ - {os.getenv("FILE_NAME")} - Sekcja {section} - Stacjonarne")
+                calendar.color = "blue"
+                calendar.add("X-APPLE-CALENDAR-COLOR", "#0000FF")
+            case "online":
+                calendar.add("name", f"Plan zajęć AŚ - {os.getenv("FILE_NAME")} - Sekcja {section} - Zdalnie")
+                calendar.add("X-WR-CALNAME", f"Plan zajęć AŚ - {os.getenv("FILE_NAME")} - Sekcja {section} - Zdalnie")
+                calendar.color = "orange"
+                calendar.add("X-APPLE-CALENDAR-COLOR", "#FFA500")
+            case _:
+                pass
+
         calendar.add("calscale", "GREGORIAN")
         calendar.add("method", "PUBLISH")
 
@@ -106,7 +122,16 @@ class ICalendarService(CalendarBaseService):
                         alarm.add("trigger", timedelta(minutes=minutes))
                         event.add_component(alarm)
 
-                calendar.add_component(event)
+                subject_name = subject.get("name", "").lower()
+                match events_type:
+                    case "inperson":
+                        if "online" not in subject_name:
+                            calendar.add_component(event)
+                    case "online":
+                        if "online" in subject_name:
+                            calendar.add_component(event)
+                    case _:
+                        pass
 
         ical_bytes = calendar.to_ical()
         ical_text = ical_bytes.decode("utf-8")
@@ -206,9 +231,9 @@ class ScheduleService:
 
         return result
 
-    def create_calendar(self, schedules: List[Schedule], calendar_package: str) -> str:
+    def create_calendar(self, schedules: List[Schedule], events_type: str, section: str, calendar_package: str) -> str:
         data = self._prepare_data(schedules)
-        return calendar_serializers_mapper[calendar_package].serialize_calendar(data)
+        return calendar_serializers_mapper[calendar_package].serialize_calendar(data, events_type=events_type, section=section)
 
 
 class ScheduleFileService:

@@ -11,14 +11,15 @@
       <p style="font-size: 42px; text-align: center; margin: 16px 0">
          Lekarski semestr 9
       </p>
-      <p style="font-size: 26px; text-align: center; margin: 16px 0">
+      <p style="font-size: 26px; text-align: center; margin: 16px 0; padding-bottom: 20px">
          Kliknij swoją sekcję, aby dodać subskrypcję kalendarza na swój smartfon.
       </p>
+      <p style="font-size: 34px; text-align: center; margin: 16px 0; font-weight: bold">TYLKO zajęcia stacjonarne</p>
       <div class="wrapper">
          {% for section in sections %}
          <a
             class="calendar"
-            href="webcal://{{ host }}/api/plan_zajec_lekarski_as.ics?section={{ section }}"
+            href="webcal://{{ host }}/api/plan_zajec_lekarski_as.ics?section={{ section }}&events_type=inperson"
             aria-label="Sekcja {{ section }}"
          >
             <div class="week">Sekcja</div>
@@ -26,5 +27,18 @@
          </a>
          {% endfor %}
       </div>
+      <p style="font-size: 34px; text-align: center; margin: 16px 0; font-weight: bold">TYLKO wykłady online</p>
+      <div class="wrapper">
+            {% for section in sections %}
+            <a
+               class="calendar"
+               href="webcal://{{ host }}/api/plan_zajec_lekarski_as.ics?section={{ section }}&events_type=online"
+               aria-label="Sekcja {{ section }}"
+            >
+               <div class="week">Sekcja</div>
+               <div class="date">{{ section }}</div>
+            </a>
+            {% endfor %}
+         </div>
    </body>
 </html>

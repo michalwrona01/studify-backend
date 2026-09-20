@@ -17,6 +17,10 @@ class ScheduleSelector(BaseSelector):
         result = await self._db.execute(select(Schedule).where(Schedule.section == section).order_by(order_by))
         return result.scalars().all()
 
+    async def get_empty(self):
+        result = await self._db.execute(select(Schedule).limit(0))
+        return result.scalars().all()
+
     async def get_last_modified_by_section(self, *, section: str):
         result = await self._db.execute(
             select(Schedule.modified_at)

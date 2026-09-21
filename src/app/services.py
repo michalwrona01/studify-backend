@@ -125,7 +125,7 @@ class ICalendarService(CalendarBaseService):
                 subject_name = subject.get("name", "").lower()
                 match events_type:
                     case "inperson":
-                        if "online" not in subject_name:
+                        if "online" not in subject_name and "Ginekologia i położnictwo (IX-X) dr n. med. Robert Kiełbasiński wykład" not in subject_name:
                             calendar.add_component(event)
                     case "online":
                         if "online" in subject_name or "Ginekologia i położnictwo (IX-X) dr n. med. Robert Kiełbasiński wykład" in subject_name:

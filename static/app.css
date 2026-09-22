@@ -53,7 +53,7 @@ h2 { font-size: 22px; font-weight: 400; margin: 0 0 10px; }
 .calendar-option > .muted { margin: 0 0 24px; font-size: 14px; }
 .calendar-option a.calendar { border-radius: 36px; font-family: inherit; box-shadow: 0 8px 28px #00000006; }
 .calendar-option a.calendar .week { color: var(--accent); }
-.calendar-option a.calendar .date { font-family: inherit; font-size: clamp(30px, 7vw, 80px); margin-top: 0; overflow-wrap: anywhere; line-height: 1.15; padding: 8px 12px; }
+.calendar-option a.calendar .date { font-family: inherit; font-size: 80px; margin-top: 0; overflow-wrap: anywhere; line-height: 1.15; padding: 8px 12px; }
 .calendar-caption { font-size: 12px; color: var(--muted); margin-top: 20px; }
 .calendar-caption span { color: var(--accent); margin-left: 6px; }
 .heading-row { display: flex; justify-content: space-between; align-items: center; gap: 20px; }

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}Studify{% endblock %}</title>
+  <link rel="stylesheet" href="/static/output.css" />
+  <link rel="stylesheet" href="/static/app.css" />
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="Studify — kalendarz"><span class="brand-mark" aria-hidden="true">S</span>studify<span class="brand-dot">.</span></a>
+    {% if user %}
+    <nav class="account-nav" aria-label="Menu konta">
+      <a class="nav-link" href="/account">Powiadomienia</a>
+      {% if user.is_admin %}<a class="nav-link" href="/admin">Użytkownicy</a>{% endif %}
+      <span class="account-name">{{ user.username }}</span>
+      <form method="post" action="/logout">
+        <input type="hidden" name="csrf" value="{{ csrf_token }}" />
+        <button class="button button-secondary logout-button" type="submit">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M9 4H4v16h5M14 8l4 4-4 4M8 12h11" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Wyloguj
+        </button>
+      </form>
+    </nav>
+    {% endif %}
+  </header>
+  {% block content %}{% endblock %}
+  <footer class="site-footer">Studify <span aria-hidden="true">·</span> Twój plan. Twój czas.</footer>
+</body>
+</html>

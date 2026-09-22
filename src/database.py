@@ -17,7 +17,7 @@ Base = declarative_base()
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    engine = create_async_engine(SQLALCHEMY_DATABASE_URL, echo=True, poolclass=NullPool)
+    engine = create_async_engine(SQLALCHEMY_DATABASE_URL, echo=False, hide_parameters=True, poolclass=NullPool)
     async_session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with async_session_maker() as session:
         try:

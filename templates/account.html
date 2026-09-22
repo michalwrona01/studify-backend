@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Powiadomienia — Studify{% endblock %}
+{% block content %}
+<main class="page form-page">
+  <a class="back-link" href="/">← Wróć do kalendarza</a>
+  <div class="page-heading"><p class="eyebrow">TWOJE KONTO</p><h1>Powiadomienia e-mail</h1><p class="muted">Ty decydujesz, czy chcesz dostawać wiadomości o zmianach planu.</p></div>
+  <section class="panel form-panel">
+    {% if saved %}<p class="notice" role="status">Ustawienia zostały zapisane.</p>{% endif %}
+    {% if error %}<p class="notice notice-error" role="alert">{{ error }}</p>{% endif %}
+    <form method="post" action="/account" class="stack-form">
+      <input type="hidden" name="csrf" value="{{ csrf_token }}" />
+      {% include "email_preferences.html" %}
+      <p class="field-hint">Wyłączenie wiadomości nie zmienia Twojej subskrypcji kalendarza.</p>
+      <div class="form-actions"><button type="submit" class="button button-primary">Zapisz ustawienia</button></div>
+    </form>
+  </section>
+</main>
+{% endblock %}

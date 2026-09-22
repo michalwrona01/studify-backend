@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Użytkownicy — Studify{% endblock %}
+{% block content %}
+<main class="page admin-page">
+  <a class="back-link" href="/">← Wróć do kalendarza</a>
+  <div class="page-heading heading-row"><div><p class="eyebrow">PANEL ADMINISTRATORA</p><h1>Użytkownicy<span class="count-badge">{{ users | length }}</span></h1><p class="muted">Zarządzaj kontami i przypisaniem sekcji.</p></div><a class="button button-primary" href="/admin/users/new"><span aria-hidden="true">＋</span> Dodaj użytkownika</a></div>
+  <section class="panel table-panel" aria-label="Lista użytkowników">
+    <div class="table-scroll"><table>
+      <thead><tr><th scope="col">Użytkownik</th><th scope="col">E-mail</th><th scope="col">Powiadomienia</th><th scope="col">Sekcja</th><th scope="col">Rola</th><th scope="col" class="actions-cell">Akcje</th></tr></thead>
+      <tbody>{% for account in users %}<tr>
+        <td><span class="user-cell"><span class="avatar" aria-hidden="true">{{ account.username[0] | upper }}</span><span>{{ account.username }}{% if account.id == user.id %}<span class="you-label">Ty</span>{% endif %}</span></span></td>
+        <td>{{ account.email or "—" }}</td>
+        <td><span class="section-badge">{{ "Włączone" if account.email_notifications else "Wyłączone" }}</span></td>
+        <td>{% if account.section %}<span class="section-badge">Sekcja {{ account.section }}</span>{% else %}<span class="pending-badge">Do przypisania</span>{% endif %}</td>
+        <td><span class="role-label">{{ 'Administrator' if account.is_admin else 'Użytkownik' }}</span></td>
+        <td class="actions-cell"><div class="row-actions"><a class="button button-small button-secondary" href="/admin/users/{{ account.id }}/edit" aria-label="Edytuj użytkownika {{ account.username }}">Edytuj</a>{% if account.id != user.id %}<a class="button button-small button-danger-quiet" href="/admin/users/{{ account.id }}/delete" aria-label="Usuń użytkownika {{ account.username }}">Usuń</a>{% endif %}</div></td>
+      </tr>{% else %}<tr><td colspan="6" class="empty-state">Brak użytkowników.</td></tr>{% endfor %}</tbody>
+    </table></div>
+    <div class="table-note">Każdy użytkownik ma jedną sekcję i własny link subskrypcji.</div>
+  </section>
+</main>
+{% endblock %}

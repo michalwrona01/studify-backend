@@ -16,13 +16,11 @@ smtp_config = ConnectionConfig(
 
 
 class ScheduleMailConfig(BaseSettings):
-    MAILS_TO: str
     MAIL_SUBJECT: str
     MAIL_BODY: str
 
 
 schedule_mail_config = ScheduleMailConfig(
-    MAILS_TO=os.getenv("MAILS_TO"),
     MAIL_SUBJECT=f"Aktualizacja planu zajęć - AŚ - {os.getenv("FILE_NAME")}",
     MAIL_BODY="""<p>Cześć, nastąpiła zmiana w planie zajęć.</p>
         <p>Powodzenia!</p>

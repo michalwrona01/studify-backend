@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Usuń użytkownika — Studify{% endblock %}
+{% block content %}
+<main class="page form-page">
+  <a class="back-link" href="/admin">← Wszyscy użytkownicy</a>
+  <section class="panel form-panel delete-panel">
+    <p class="eyebrow">USUWANIE KONTA</p><h1>Usunąć użytkownika?</h1>
+    <p class="muted">Konto <strong>{{ target.username }}</strong> zostanie trwale usunięte. Jego sesje i link subskrypcji przestaną działać.</p>
+    <form method="post" action="/admin/users/{{ target.id }}/delete">
+      <input type="hidden" name="csrf" value="{{ csrf_token }}" />
+      <div class="form-actions"><a class="button button-secondary" href="/admin">Anuluj</a><button type="submit" class="button button-primary">Usuń użytkownika</button></div>
+    </form>
+  </section>
+</main>
+{% endblock %}

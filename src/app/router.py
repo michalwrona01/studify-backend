@@ -1,15 +1,18 @@
 from datetime import datetime
 from hashlib import md5
+from tempfile import SpooledTemporaryFile
 from typing import List
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Response, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from starlette.templating import Jinja2Templates
 
 from src.config import settings
 from src.app.config import schedule_mail_config, smtp_config
-from src.app.models import Schedule
+from src.app.dependencies import require_calendar_subscription_token
+from src.app.models import Schedule, User
 from src.app.schemas import ScheduleCreate, ScheduleResponse
 from src.app.models_selectors import ScheduleSelector
 from src.app.services import ScheduleFileService, ScheduleService, SMTPService
@@ -18,21 +21,40 @@ from src.database import get_db
 router = APIRouter(prefix="/api")
 templates = Jinja2Templates(directory="templates")
 
+
 @router.post("/schedules/files")
 async def schedule_file_md5_update_and_send_mail(file: UploadFile, db: AsyncSession = Depends(get_db)):
     is_send_notifications = await ScheduleFileService.create_or_update_md5_file(file=file, db=db)
     await file.seek(0)
 
+    is_email_sent = False
     if is_send_notifications and settings.IS_EMAILS_SEND:
-        smtp_client = SMTPService(config=smtp_config)
-        await smtp_client.send_mail(
-            recipients=schedule_mail_config.MAILS_TO.split(","),
-            subject=f"{schedule_mail_config.MAIL_SUBJECT} - {datetime.now(tz=ZoneInfo("Europe/Warsaw"))}",
-            body=templates.get_template("mail.html").render(),
-            attachments=[file],
-        )
+        recipients = (
+            await db.scalars(
+                select(User.email)
+                .where(User.email_notifications.is_(True), User.email.is_not(None), User.email != "")
+                .distinct()
+            )
+        ).all()
+        if recipients:
+            smtp_client = SMTPService(config=smtp_config)
+            attachment_data = await file.read()
+            for email in recipients:
+                attachment = UploadFile(file=SpooledTemporaryFile(), filename=file.filename, headers=file.headers)
+                try:
+                    await attachment.write(attachment_data)
+                    await attachment.seek(0)
+                    await smtp_client.send_mail(
+                        recipients=[email],
+                        subject=f"{schedule_mail_config.MAIL_SUBJECT} - {datetime.now(tz=ZoneInfo('Europe/Warsaw'))}",
+                        body=templates.get_template("mail.html").render(),
+                        attachments=[attachment],
+                    )
+                finally:
+                    await attachment.close()
+            is_email_sent = True
 
-    return {"is_email_sent": is_send_notifications}
+    return {"is_email_sent": is_email_sent}
 
 
 @router.post("/schedules", response_model=List[ScheduleCreate])
@@ -41,7 +63,7 @@ async def schedule_create(schedules: List[ScheduleCreate], db: AsyncSession = De
     return schedules
 
 
-@router.get("/plan_zajec_lekarski_as.ics")
+@router.get("/plan_zajec_lekarski_as.ics", dependencies=[Depends(require_calendar_subscription_token)])
 async def ical_export(section: str = "1", db: AsyncSession = Depends(get_db), events_type: str = ""):
     selector = ScheduleSelector(db=db)
 
@@ -52,7 +74,9 @@ async def ical_export(section: str = "1", db: AsyncSession = Depends(get_db), ev
     schedules_list = [ScheduleResponse.model_validate(s).model_dump() for s in schedules]
     etag = md5(str(schedules_list).encode()).hexdigest()
 
-    calendar_data = ScheduleService().create_calendar(schedules=schedules, events_type=events_type, section=section, calendar_package="icalendar")
+    calendar_data = ScheduleService().create_calendar(
+        schedules=schedules, events_type=events_type, section=section, calendar_package="icalendar"
+    )
 
     last_modified = await selector.get_last_modified_by_section(section=section)
 

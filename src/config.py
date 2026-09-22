@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from pydantic import Field
 
 from vault.vault_settings import *
 
@@ -14,6 +15,8 @@ class DatabaseConfig(BaseSettings):
 class Settings(BaseSettings):
     DEBUG: bool
     IS_EMAILS_SEND: bool
+    SESSION_SECRET_KEY: str = Field(min_length=32)
+    SESSION_COOKIE_SECURE: bool = True
 
 
 database_settings = DatabaseConfig(
@@ -24,4 +27,8 @@ database_settings = DatabaseConfig(
     DATABASE_DB=os.getenv("DATABASE_DB"),
 )
 
-settings = Settings(DEBUG=bool(int(os.getenv("DEBUG", "0"))), IS_EMAILS_SEND=bool(int(os.getenv("IS_EMAILS_SEND", "0"))))
+settings = Settings(
+    DEBUG=bool(int(os.getenv("DEBUG", "0"))),
+    IS_EMAILS_SEND=bool(int(os.getenv("IS_EMAILS_SEND", "0"))),
+    SESSION_SECRET_KEY=os.getenv("SESSION_SECRET_KEY", ""),
+)

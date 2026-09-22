@@ -1,44 +1,28 @@
-<!doctype html>
-<html lang="pl">
-   <head>
-      <meta charset="utf-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1" />
-      <title>Dodaj do Kalendarza</title>
-      <link rel="stylesheet" href="/static/output.css" />
-      <!-- Twój skompilowany CSS -->
-   </head>
-   <body>
-      <p style="font-size: 42px; text-align: center; margin: 16px 0">
-         Lekarski semestr 9
-      </p>
-      <p style="font-size: 26px; text-align: center; margin: 16px 0; padding-bottom: 20px">
-         Kliknij swoją sekcję, aby dodać subskrypcję kalendarza na swój smartfon.
-      </p>
-      <p style="font-size: 34px; text-align: center; margin: 16px 0; font-weight: bold">TYLKO zajęcia stacjonarne</p>
-      <div class="wrapper">
-         {% for section in sections %}
-         <a
-            class="calendar"
-            href="webcal://{{ host }}/api/plan_zajec_lekarski_as.ics?section={{ section }}&events_type=inperson"
-            aria-label="Sekcja {{ section }}"
-         >
-            <div class="week">Sekcja</div>
-            <div class="date">{{ section }}</div>
-         </a>
-         {% endfor %}
-      </div>
-      <p style="font-size: 34px; text-align: center; margin: 16px 0; font-weight: bold">TYLKO wykłady online</p>
-      <div class="wrapper">
-            {% for section in sections %}
-            <a
-               class="calendar"
-               href="webcal://{{ host }}/api/plan_zajec_lekarski_as.ics?section={{ section }}&events_type=online"
-               aria-label="Sekcja {{ section }}"
-            >
-               <div class="week">Sekcja</div>
-               <div class="date">{{ section }}</div>
-            </a>
-            {% endfor %}
-         </div>
-   </body>
-</html>
+{% extends "base.html" %}
+{% block title %}Twój kalendarz — Studify{% endblock %}
+{% block content %}
+<main class="page calendar-page">
+  <div class="page-heading centered">
+    <p class="eyebrow">TWÓJ PLAN ZAJĘĆ</p>
+    <h1>Lekarski, semestr 9</h1>
+    <p class="muted">{% if sections %}Sekcja {{ sections[0] }}. Wybierz kalendarz i dodaj go do swojego telefonu.{% else %}Wszystko w jednym miejscu, zawsze pod ręką.{% endif %}</p>
+  </div>
+  {% if sections %}
+  <div class="calendar-options">
+    {% for kind, label, description in [('inperson', 'Zajęcia stacjonarne', 'Twój plan zajęć na uczelni.'), ('online', 'Wykłady online', 'Zajęcia zdalne w Twoim kalendarzu.')] %}
+    <section class="calendar-option">
+      <h2>{{ label }}</h2><p class="muted">{{ description }}</p>
+      {% for section in sections %}
+      <a class="calendar" href="webcal://{{ host }}/api/plan_zajec_lekarski_as.ics?section={{ section | urlencode }}&events_type={{ kind }}&token={{ token | urlencode }}" aria-label="Dodaj kalendarz: {{ label }}, sekcja {{ section }}">
+        <div class="week">Sekcja</div><div class="date">{{ section }}</div>
+      </a>
+      {% endfor %}
+      <p class="calendar-caption">Dodaj subskrypcję <span aria-hidden="true">↗</span></p>
+    </section>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="panel empty-state"><h2>Czekamy na Twoją sekcję</h2><p class="muted">Administrator musi przypisać Ci sekcję, zanim dodasz kalendarz.</p>{% if user.is_admin %}<a class="button button-primary" href="/admin">Przejdź do użytkowników</a>{% endif %}</div>
+  {% endif %}
+</main>
+{% endblock %}

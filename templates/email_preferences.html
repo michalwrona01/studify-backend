@@ -1,0 +1,9 @@
+<div>
+  <label for="email">Adres e-mail</label>
+  <input id="email" name="email" type="email" value="{{ values.email or '' }}" maxlength="254" autocomplete="email" placeholder="jan@example.com" aria-describedby="email-hint" />
+  <p class="field-hint" id="email-hint">Wymagany, jeśli chcesz otrzymywać powiadomienia.</p>
+</div>
+<label class="checkbox-field">
+  <input type="checkbox" name="email_notifications" value="true" {% if values.email_notifications %}checked{% endif %} />
+  <span>Powiadomienia e-mail o zmianach planu<small>Użytkownik może je w każdej chwili włączyć lub wyłączyć w ustawieniach konta.</small></span>
+</label>

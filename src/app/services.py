@@ -265,14 +265,21 @@ class SMTPService:
 
     async def send_mail(
         self,
-        recipients: List[EmailStr],
+        recipients: Optional[List[EmailStr]] = None,
         subject: str = "",
         body: Optional[Union[str, list]] = None,
-        subtype: MessageType = "html",
-        attachments: List[Union[UploadFile, Dict, str]] = None,
+        subtype: MessageType = MessageType.html,
+        attachments: Optional[List[Union[UploadFile, Dict, str]]] = None,
+        bcc: Optional[List[EmailStr]] = None,
     ) -> bool:
         message = MessageSchema(
-            subject=subject, recipients=recipients, body=body, subtype=subtype, attachments=attachments
+            from_name="studify.",
+            subject=subject,
+            recipients=recipients or [],
+            bcc=bcc or [],
+            body=body,
+            subtype=subtype,
+            attachments=attachments or [],
         )
         await self.client.send_message(message)
         return True

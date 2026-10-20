@@ -740,13 +740,14 @@ class CalendarAuthorizationTests(unittest.IsolatedAsyncioTestCase):
     async def test_recovery_smtp_diagnostics_unwrap_failures_without_leaking_secrets(self):
         import socket
         import ssl
-        from aiosmtplib.errors import SMTPAuthenticationError
+        from aiosmtplib.errors import SMTPAuthenticationError, SMTPSenderRefused
         from fastapi_mail.errors import ConnectionErrors
         from src.app.password_reset import send_recovery_mail
 
         sensitive = "private-password alice@example.com token=private-token"
         cases = (
             (SMTPAuthenticationError(535, sensitive), "MAIL_PASSWORD", "smtp_code=535"),
+            (SMTPSenderRefused(550, sensitive, "alice@example.com"), "MAIL_FROM", "smtp_code=550"),
             (socket.gaierror(-2, sensitive), "DNS", "errno=-2"),
             (ConnectionRefusedError(111, sensitive), "MAIL_PORT", "errno=111"),
             (TimeoutError(sensitive), "firewall", "cause=TimeoutError"),
@@ -768,6 +769,8 @@ class CalendarAuthorizationTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn("exception=ConnectionErrors", output)
             self.assertIn(hint, output)
             self.assertIn(detail, output)
+            self.assertIn("use_credentials=", output)
+            self.assertIn("sender_matches_username=", output)
             for value in ("private-password", "alice@example.com", "private-token"):
                 self.assertNotIn(value, output)
 

@@ -32,5 +32,5 @@ settings = Settings(
     DEBUG=bool(int(os.getenv("DEBUG", "0"))),
     IS_EMAILS_SEND=bool(int(os.getenv("IS_EMAILS_SEND", "0"))),
     SESSION_SECRET_KEY=os.getenv("SESSION_SECRET_KEY", ""),
-    PUBLIC_BASE_URL=os.getenv("PUBLIC_BASE_URL", ""),
+    PUBLIC_BASE_URL=os.getenv("PUBLIC_BASE_URL") or None,
 )

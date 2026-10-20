@@ -7,7 +7,7 @@ import socket
 import ssl
 import time
 
-from aiosmtplib.errors import SMTPAuthenticationError, SMTPException, SMTPResponseException
+from aiosmtplib.errors import SMTPAuthenticationError, SMTPException, SMTPResponseException, SMTPSenderRefused
 from fastapi import APIRouter, BackgroundTasks, Depends, Form, Query, Request
 from fastapi.responses import RedirectResponse
 from fastapi_mail import MessageType
@@ -55,6 +55,13 @@ def log_recovery_mail_error(error: Exception) -> None:
         cause = nested
     if isinstance(cause, SMTPAuthenticationError):
         hint = "Sprawdź MAIL_USERNAME, MAIL_PASSWORD oraz dostęp SMTP na koncie nadawcy."
+    elif isinstance(cause, SMTPSenderRefused):
+        hint = (
+            "Serwer odrzucił nadawcę na etapie MAIL FROM. Sprawdź MAIL_FROM: musi być adresem "
+            "dozwolonym dla konta MAIL_USERNAME (zwykle ta sama skrzynka lub autoryzowany alias). "
+            "Sprawdź USE_CREDENTIALS=1 i politykę nadawców serwera. "
+            "Kod 550 nie podaje dokładnej przyczyny; sprawdź odpowiedź w logach serwera SMTP."
+        )
     elif isinstance(cause, ssl.SSLError):
         hint = "Sprawdź certyfikat serwera oraz MAIL_STARTTLS i MAIL_SSL_TLS."
     elif isinstance(cause, socket.gaierror):
@@ -67,7 +74,7 @@ def log_recovery_mail_error(error: Exception) -> None:
         hint = "Sprawdź konfigurację SMTP i logi serwera pocztowego."
     logger.error(
         "password_recovery.smtp_failed exception=%s cause=%s smtp_code=%s errno=%s "
-        "server=%s port=%s starttls=%s ssl_tls=%s. %s",
+        "server=%s port=%s starttls=%s ssl_tls=%s use_credentials=%s sender_matches_username=%s. %s",
         type(error).__name__,
         type(cause).__name__,
         cause.code if isinstance(cause, SMTPResponseException) and isinstance(cause.code, int) else None,
@@ -76,6 +83,8 @@ def log_recovery_mail_error(error: Exception) -> None:
         smtp_config.MAIL_PORT,
         smtp_config.MAIL_STARTTLS,
         smtp_config.MAIL_SSL_TLS,
+        smtp_config.USE_CREDENTIALS,
+        str(smtp_config.MAIL_FROM).casefold() == str(smtp_config.MAIL_USERNAME).casefold(),
         hint,
     )
 

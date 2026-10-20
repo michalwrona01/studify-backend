@@ -170,3 +170,18 @@ Formularz zwraca ten sam komunikat dla kont istniejących i nieistniejących.
 Wiadomość dla jednego konta można zamówić raz na minutę. Produkcyjny reverse proxy
 powinien dodatkowo ograniczać liczbę żądań do `/forgot-password` według IP
 i nie zapisywać parametrów URL linków `/reset-password` w logach.
+
+### Diagnostyka odzyskiwania hasła
+
+Odpowiedź HTTP 503 z formularza oznacza blokadę konfiguracji przed wysyłką SMTP.
+Strona wskazuje brak `PUBLIC_BASE_URL`, wyłączone `IS_EMAILS_SEND` lub oba problemy.
+Log ERROR `password_recovery.configuration_unavailable` podaje te same przyczyny.
+Ustaw wartości w środowisku procesu albo w Vault `backend/app` i uruchom ponownie
+backend. Przy włączonym Vault jego wartości nadpisują zmienne środowiskowe.
+
+Jeśli formularz przyjmuje zgłoszenie, ale e-mail nie przychodzi, szukaj wpisu ERROR
+`password_recovery.smtp_failed`. Zawiera typ wyjątku i pierwotnej przyczyny,
+kod SMTP (jeśli dostępny), errno, serwer, port, tryb TLS oraz wskazówkę dla błędów
+logowania, DNS, TLS, timeoutu lub odmowy połączenia. W Dockerze odczytaj go przez
+`docker logs studify-backend`. Log nie zawiera haseł, adresów odbiorców ani tokenów.
+Wysyłka działa w tle: odpowiedź formularza nie potwierdza dostarczenia wiadomości.

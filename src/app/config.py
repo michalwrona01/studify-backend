@@ -28,5 +28,5 @@ schedule_mail_config = ScheduleMailConfig(
         Plik w załączniku.
         <br><br>
         Jeśli chcesz dodać plan zajęć na swój telefon to wejdź na:
-        <a href="https://as.wronamichal.online/">https://as.wronamichal.online</a>""",
+        <a href="https://as.michalwrona.pl/">https://as.michalwrona.pl</a>""",
 )

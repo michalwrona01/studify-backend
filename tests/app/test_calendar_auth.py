@@ -717,15 +717,59 @@ class CalendarAuthorizationTests(unittest.IsolatedAsyncioTestCase):
         csrf = re.search(r'name="csrf" value="([^"]+)"', page.text).group(1)
         data = {"username": "alice", "csrf": csrf}
         self.assertEqual((await self.client.post("/forgot-password", data=data | {"csrf": ""})).status_code, 403)
-        for enabled, origin in ((False, "https://studify.example"), (True, None)):
+        for enabled, origin in ((False, "https://studify.example"), (True, None), (False, None)):
             with patch.object(settings, "IS_EMAILS_SEND", enabled), patch.object(settings, "PUBLIC_BASE_URL", origin):
-                self.assertEqual((await self.client.post("/forgot-password", data=data)).status_code, 503)
+                with self.assertLogs("src.app.password_reset", level="ERROR") as logs:
+                    response = await self.client.post("/forgot-password", data=data)
+                self.assertEqual(response.status_code, 503)
+                self.assertEqual("Ustaw IS_EMAILS_SEND=1" in response.text, not enabled)
+                self.assertEqual("Ustaw PUBLIC_BASE_URL" in response.text, origin is None)
+                self.assertIn("Vault backend/app", response.text)
+                self.assertIn("password_recovery.configuration_unavailable", "".join(logs.output))
+                self.assertIn(f"IS_EMAILS_SEND={enabled}", "".join(logs.output))
+                self.assertIn(f"PUBLIC_BASE_URL_configured={bool(origin)}", "".join(logs.output))
         with patch("src.app.password_reset.SMTPService") as smtp:
             smtp.return_value.send_mail = AsyncMock(side_effect=OSError("secret SMTP error"))
             with self.assertLogs("src.app.password_reset", level="WARNING") as logs:
                 await send_recovery_mail("alice@example.com", "https://studify.example/reset-password?token=secret")
             self.assertNotIn("secret", "".join(logs.output))
             self.assertNotIn("alice@example.com", "".join(logs.output))
+            self.assertIn("password_recovery.smtp_failed", "".join(logs.output))
+            self.assertIn("cause=OSError", "".join(logs.output))
+
+    async def test_recovery_smtp_diagnostics_unwrap_failures_without_leaking_secrets(self):
+        import socket
+        import ssl
+        from aiosmtplib.errors import SMTPAuthenticationError
+        from fastapi_mail.errors import ConnectionErrors
+        from src.app.password_reset import send_recovery_mail
+
+        sensitive = "private-password alice@example.com token=private-token"
+        cases = (
+            (SMTPAuthenticationError(535, sensitive), "MAIL_PASSWORD", "smtp_code=535"),
+            (socket.gaierror(-2, sensitive), "DNS", "errno=-2"),
+            (ConnectionRefusedError(111, sensitive), "MAIL_PORT", "errno=111"),
+            (TimeoutError(sensitive), "firewall", "cause=TimeoutError"),
+            (ssl.SSLError(sensitive), "certyfikat", "cause=SSLError"),
+        )
+        for original, hint, detail in cases:
+            async def fail(*args, **kwargs):
+                try:
+                    raise original
+                except Exception:
+                    # Match FastAPI-Mail's implicit exception context.
+                    raise ConnectionErrors(sensitive)
+
+            with patch("src.app.password_reset.SMTPService") as smtp:
+                smtp.return_value.send_mail = AsyncMock(side_effect=fail)
+                with self.assertLogs("src.app.password_reset", level="ERROR") as logs:
+                    await send_recovery_mail("alice@example.com", "https://example.com/?token=private-token")
+            output = "".join(logs.output)
+            self.assertIn("exception=ConnectionErrors", output)
+            self.assertIn(hint, output)
+            self.assertIn(detail, output)
+            for value in ("private-password", "alice@example.com", "private-token"):
+                self.assertNotIn(value, output)
 
     async def test_no_mail_when_disabled_unchanged_or_no_subscribers(self):
         from src.config import settings

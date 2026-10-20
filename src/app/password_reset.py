@@ -3,9 +3,11 @@ import hashlib
 import json
 import logging
 import secrets
+import socket
+import ssl
 import time
 
-from aiosmtplib.errors import SMTPException
+from aiosmtplib.errors import SMTPAuthenticationError, SMTPException, SMTPResponseException
 from fastapi import APIRouter, BackgroundTasks, Depends, Form, Query, Request
 from fastapi.responses import RedirectResponse
 from fastapi_mail import MessageType
@@ -27,6 +29,55 @@ templates = Jinja2Templates(directory="templates")
 TOKEN_LIFETIME = 30 * 60
 REQUEST_COOLDOWN = 60
 INVALID_LINK = "Link jest nieprawidłowy, wygasł lub został już użyty. Poproś o nowy link."
+logger = logging.getLogger(__name__)
+
+
+def recovery_configuration_errors() -> list[str]:
+    errors = []
+    if not settings.IS_EMAILS_SEND:
+        errors.append("Wysyłanie e-maili jest wyłączone. Ustaw IS_EMAILS_SEND=1.")
+    if not settings.PUBLIC_BASE_URL:
+        errors.append("Brakuje adresu aplikacji. Ustaw PUBLIC_BASE_URL, np. https://as.michalwrona.pl.")
+    return errors
+
+
+def log_recovery_mail_error(error: Exception) -> None:
+    # FastAPI-Mail wraps connection failures in ConnectionErrors. Inspect the
+    # original exception, but never log its message (it may contain credentials,
+    # recipient addresses or provider diagnostics echoing submitted data).
+    cause = error
+    seen = set()
+    while id(cause) not in seen:
+        seen.add(id(cause))
+        nested = cause.__cause__ or cause.__context__
+        if nested is None or id(nested) in seen:
+            break
+        cause = nested
+    if isinstance(cause, SMTPAuthenticationError):
+        hint = "Sprawdź MAIL_USERNAME, MAIL_PASSWORD oraz dostęp SMTP na koncie nadawcy."
+    elif isinstance(cause, ssl.SSLError):
+        hint = "Sprawdź certyfikat serwera oraz MAIL_STARTTLS i MAIL_SSL_TLS."
+    elif isinstance(cause, socket.gaierror):
+        hint = "Sprawdź MAIL_SERVER oraz rozwiązywanie DNS w kontenerze aplikacji."
+    elif isinstance(cause, TimeoutError):
+        hint = "Sprawdź dostęp sieciowy do SMTP, firewall i port serwera."
+    elif isinstance(cause, ConnectionRefusedError):
+        hint = "Serwer odrzucił połączenie. Sprawdź MAIL_SERVER, MAIL_PORT i dostępność SMTP."
+    else:
+        hint = "Sprawdź konfigurację SMTP i logi serwera pocztowego."
+    logger.error(
+        "password_recovery.smtp_failed exception=%s cause=%s smtp_code=%s errno=%s "
+        "server=%s port=%s starttls=%s ssl_tls=%s. %s",
+        type(error).__name__,
+        type(cause).__name__,
+        cause.code if isinstance(cause, SMTPResponseException) and isinstance(cause.code, int) else None,
+        cause.errno if isinstance(cause, OSError) and isinstance(cause.errno, int) else None,
+        smtp_config.MAIL_SERVER,
+        smtp_config.MAIL_PORT,
+        smtp_config.MAIL_STARTTLS,
+        smtp_config.MAIL_SSL_TLS,
+        hint,
+    )
 
 
 def token_digest(user: User, token: str) -> str:
@@ -45,9 +96,8 @@ async def send_recovery_mail(email: str, link: str) -> None:
             "Jeśli nie prosisz o zmianę hasła, zignoruj tę wiadomość.",
             subtype=MessageType.plain,
         )
-    except (SMTPException, ConnectionErrors, OSError):
-        # Do not expose addresses, tokens or SMTP credentials in logs/responses.
-        logging.getLogger(__name__).warning("Nie udało się wysłać wiadomości odzyskiwania hasła.")
+    except (SMTPException, ConnectionErrors, OSError) as error:
+        log_recovery_mail_error(error)
 
 
 @router.get("/forgot-password")
@@ -66,13 +116,25 @@ async def forgot_password(
     db: AsyncSession = Depends(get_db),
 ):
     validate_csrf(request, csrf)
-    if not settings.IS_EMAILS_SEND or not settings.PUBLIC_BASE_URL:
+    configuration_errors = recovery_configuration_errors()
+    if configuration_errors:
+        explanation = " ".join(configuration_errors)
+        logger.error(
+            "password_recovery.configuration_unavailable IS_EMAILS_SEND=%s PUBLIC_BASE_URL_configured=%s. "
+            "%s Uzupełnij konfigurację środowiska lub Vault backend/app i uruchom ponownie backend.",
+            settings.IS_EMAILS_SEND,
+            bool(settings.PUBLIC_BASE_URL),
+            explanation,
+        )
         return templates.TemplateResponse(
             request=request,
             name="forgot_password.html",
             context={
                 "csrf_token": csrf_token(request),
-                "error": "Odzyskiwanie hasła jest obecnie niedostępne. Skontaktuj się z administratorem.",
+                "error": "Odzyskiwanie hasła jest niedostępne z powodu konfiguracji serwera. "
+                + explanation
+                + " Administrator musi uzupełnić konfigurację środowiska lub Vault backend/app "
+                "i uruchomić ponownie backend.",
             },
             status_code=503,
         )

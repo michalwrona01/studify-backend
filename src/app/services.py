@@ -275,7 +275,10 @@ class SMTPService:
         message = MessageSchema(
             from_name="studify.",
             subject=subject,
-            recipients=recipients or [],
+            # FastAPI-Mail emits an empty To header for [], which aiosmtplib
+            # interprets as an empty envelope recipient. Use our own address
+            # for To; all selected user addresses remain exclusively in BCC.
+            recipients=recipients or ([self.client.config.MAIL_FROM] if bcc else []),
             bcc=bcc or [],
             body=body,
             subtype=subtype,

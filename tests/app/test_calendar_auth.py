@@ -479,7 +479,8 @@ class CalendarAuthorizationTests(unittest.IsolatedAsyncioTestCase):
 
         async def fake_send(**kwargs):
             attachment = kwargs["attachments"][0]
-            sent.append((kwargs["recipients"], await attachment.read()))
+            self.assertFalse(kwargs.get("recipients"))
+            sent.append((kwargs["bcc"], await attachment.read()))
             await attachment.close()  # FastAPI-Mail closes each attachment after reading it.
             return True
 
@@ -494,8 +495,124 @@ class CalendarAuthorizationTests(unittest.IsolatedAsyncioTestCase):
             )
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.json()["is_email_sent"])
-        self.assertEqual(sorted(addresses[0] for addresses, _ in sent), ["alice@example.com", "charlie@example.com"])
-        self.assertTrue(all(len(addresses) == 1 and content == b"schedule content" for addresses, content in sent))
+        self.assertEqual(len(sent), 1)
+        self.assertEqual(sorted(sent[0][0]), ["alice@example.com", "charlie@example.com"])
+        self.assertEqual(sent[0][1], b"schedule content")
+
+    async def test_self_password_change_validates_and_revokes_other_sessions(self):
+        self.assertEqual((await self.client.get("/account/password")).status_code, 303)
+        self.assertEqual((await self.client.post("/account/password")).status_code, 303)
+        await self.login()
+        page = await self.client.get("/account/password")
+        self.assertEqual(page.headers["cache-control"], "no-store")
+        csrf = re.search(r'name="csrf" value="([^"]+)"', page.text).group(1)
+        data = {
+            "csrf": csrf,
+            "current_password": self.password,
+            "password": "new-secure-password",
+            "password_confirmation": "new-secure-password",
+            "user_id": "2",
+        }
+        self.assertEqual((await self.client.post("/account/password", data=data | {"csrf": ""})).status_code, 403)
+        for overrides in (
+            {"current_password": "wrong"},
+            {"password_confirmation": "different"},
+            {"password": "short", "password_confirmation": "short"},
+        ):
+            response = await self.client.post("/account/password", data=data | overrides)
+            self.assertEqual(response.status_code, 400)
+            self.assertNotIn('value="new-secure-password"', response.text)
+            self.assertTrue(verify_password(self.password, self.users[0].password_hash))
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="https://testserver") as other:
+            await self.login(client=other)
+            token = self.users[0].calendar_token
+            response = await self.client.post("/account/password", data=data)
+            self.assertEqual(response.status_code, 303)
+            self.assertIn("Hasło zostało zmienione", (await self.client.get("/account")).text)
+            self.assertEqual((await other.get("/")).status_code, 303)
+            self.assertEqual(self.users[0].calendar_token, token)
+            self.assertTrue(verify_password(self.password, self.users[1].password_hash))
+            self.assertEqual((await self.login(password=self.password, client=other)).status_code, 401)
+            self.assertEqual((await self.login(password=data["password"], client=other)).status_code, 303)
+
+    async def test_admin_mail_authorization_validation_and_bcc(self):
+        from src.config import settings
+        from fastapi_mail import MessageType
+
+        for method in (self.client.get, self.client.post):
+            self.assertEqual((await method("/admin/mail")).status_code, 303)
+        await self.login()
+        for method in (self.client.get, self.client.post):
+            self.assertEqual((await method("/admin/mail")).status_code, 403)
+        self.client.cookies.clear()
+        csrf = await self.admin_login()
+        for user in self.users:
+            user.email = "shared@example.com"
+        self.db.commit()
+        data = {
+            "csrf": csrf, "subject": "Ważna wiadomość", "body": "<b>Zwykły tekst</b>",
+            "recipients": ["shared@example.com", "shared@example.com"],
+        }
+        with patch.object(settings, "IS_EMAILS_SEND", True), patch("src.app.admin.SMTPService") as smtp:
+            smtp.return_value.send_mail = AsyncMock(return_value=True)
+            page = await self.client.get("/admin/mail")
+            self.assertEqual(page.text.count('value="shared@example.com"'), 1)
+            self.assertEqual((await self.client.post("/admin/mail", data=data | {"csrf": ""})).status_code, 403)
+            for overrides in (
+                {"recipients": []}, {"recipients": ["outside@example.com"]},
+                {"subject": " "}, {"body": " "}, {"subject": "Title\r\nBcc: outside@example.com"},
+            ):
+                self.assertEqual((await self.client.post("/admin/mail", data=data | overrides)).status_code, 400)
+            smtp.assert_not_called()
+            response = await self.client.post("/admin/mail", data=data)
+            self.assertEqual(response.status_code, 303)
+            smtp.return_value.send_mail.assert_awaited_once_with(
+                recipients=[], bcc=["shared@example.com"], subject=data["subject"],
+                body=data["body"], subtype=MessageType.plain,
+            )
+            self.assertIn("przekazana do serwera", (await self.client.get("/admin/mail")).text)
+            self.assertNotIn("przekazana do serwera", (await self.client.get("/admin/mail")).text)
+
+    async def test_admin_mail_disabled_and_smtp_failure(self):
+        from src.config import settings
+
+        csrf = await self.admin_login()
+        self.users[0].email = "alice@example.com"
+        self.db.commit()
+        data = {"csrf": csrf, "subject": "Temat", "body": "Treść", "recipients": ["alice@example.com"]}
+        with patch("src.app.admin.SMTPService") as smtp:
+            with patch.object(settings, "IS_EMAILS_SEND", False):
+                self.assertEqual((await self.client.post("/admin/mail", data=data)).status_code, 400)
+                smtp.assert_not_called()
+            with patch.object(settings, "IS_EMAILS_SEND", True):
+                smtp.return_value.send_mail = AsyncMock(side_effect=OSError("private SMTP error"))
+                response = await self.client.post("/admin/mail", data=data)
+                self.assertEqual(response.status_code, 502)
+                self.assertIn('value="Temat"', response.text)
+                self.assertIn('value="alice@example.com" checked', response.text)
+                self.assertNotIn("private SMTP error", response.text)
+
+    async def test_bcc_addresses_are_in_envelope_only(self):
+        from aiosmtplib import SMTP
+        from fastapi_mail import MessageType
+        from src.app.config import smtp_config
+        from src.app.services import SMTPService
+
+        transport = SMTP()
+        transport._ehlo_or_helo_if_needed = AsyncMock()
+        transport.sendmail = AsyncMock(return_value=({}, "OK"))
+        connection = AsyncMock()
+        connection.__aenter__.return_value = SimpleNamespace(session=transport)
+        with patch("fastapi_mail.fastmail.Connection", return_value=connection):
+            await SMTPService(smtp_config).send_mail(
+                recipients=[], bcc=["alice@example.com", "bob@example.com"],
+                subject="Test", body="Wiadomość", subtype=MessageType.plain,
+            )
+        sender, envelope, wire = transport.sendmail.await_args.args
+        self.assertEqual(set(envelope), {smtp_config.MAIL_FROM, "alice@example.com", "bob@example.com"})
+        self.assertNotIn(b"Bcc:", wire)
+        self.assertNotIn(b"alice@example.com", wire)
+        self.assertNotIn(b"bob@example.com", wire)
 
     async def test_no_mail_when_disabled_unchanged_or_no_subscribers(self):
         from src.config import settings

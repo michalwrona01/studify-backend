@@ -1,10 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Powiadomienia — Studify{% endblock %}
+{% block title %}Ustawienia konta — Studify{% endblock %}
 {% block content %}
 <main class="page form-page">
   <a class="back-link" href="/">← Wróć do kalendarza</a>
-  <div class="page-heading"><p class="eyebrow">TWOJE KONTO</p><h1>Powiadomienia e-mail</h1><p class="muted">Ty decydujesz, czy chcesz dostawać wiadomości o zmianach planu.</p></div>
+  <div class="page-heading"><p class="eyebrow">TWOJE KONTO</p><h1>Ustawienia konta</h1><a class="button button-secondary" href="/account/password">Zmień hasło</a></div>
+  {% if password_changed %}<p class="notice" role="status">Hasło zostało zmienione. Pozostałe sesje zostały wylogowane.</p>{% endif %}
   <section class="panel form-panel">
+    <h2>Powiadomienia e-mail</h2>
     {% if saved %}<p class="notice" role="status">Ustawienia zostały zapisane.</p>{% endif %}
     {% if error %}<p class="notice notice-error" role="alert">{{ error }}</p>{% endif %}
     <form method="post" action="/account" class="stack-form">

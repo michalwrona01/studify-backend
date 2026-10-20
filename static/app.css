@@ -40,6 +40,10 @@ h2 { font-size: 22px; font-weight: 400; margin: 0 0 10px; }
 .stack-form label { display: block; margin-bottom: 8px; font-weight: 500; font-size: 13px; }
 .stack-form input:not([type=hidden]):not([type=checkbox]), .stack-form select { width: 100%; min-height: 48px; padding: 12px 14px; border: 1px solid #dedbdd; border-radius: 11px; color: var(--ink); background: #fff; font-size: 14px; }
 .stack-form input::placeholder { color: #969198; }
+.stack-form textarea { width: 100%; padding: 12px 14px; border: 1px solid #dedbdd; border-radius: 11px; font: inherit; resize: vertical; }
+.mail-recipients { display: grid; gap: 12px; border: 1px solid var(--line); border-radius: 12px; padding: 16px; min-width: 0; max-height: 360px; overflow-y: auto; }
+.mail-recipients legend { font-size: 13px; font-weight: 500; }
+.mail-recipients span { overflow-wrap: anywhere; }
 .stack-form input:focus, .stack-form select:focus { border-color: var(--accent); }
 .form-footnote { font-size: 12px; line-height: 1.6; color: var(--muted); margin: 24px 0 0; }
 .site-footer { padding: 20px; margin-top: auto; text-align: center; font-size: 12px; color: #8b858a; }

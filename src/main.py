@@ -27,7 +27,7 @@ app.add_middleware(
 @app.middleware("http")
 async def private_page_headers(request: Request, call_next):
     response = await call_next(request)
-    if request.url.path in {"/", "/login", "/logout", "/account"} or request.url.path.startswith("/admin"):
+    if request.url.path in {"/", "/login", "/logout"} or request.url.path.startswith(("/admin", "/account")):
         response.headers["Cache-Control"] = "no-store"
         response.headers["Referrer-Policy"] = "no-referrer"
     return response

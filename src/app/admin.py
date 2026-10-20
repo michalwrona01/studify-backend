@@ -1,22 +1,104 @@
 import asyncio
 import secrets
 
+from aiosmtplib.errors import SMTPException
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
+from fastapi_mail import MessageType
+from fastapi_mail.errors import ConnectionErrors
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.templating import Jinja2Templates
 
 from src.app.auth import csrf_token, validate_csrf
+from src.app.config import smtp_config
 from src.app.dependencies import require_admin
 from src.app.models import User
 from src.app.security import hash_password
+from src.app.services import SMTPService
 from src.app.user_management import available_sections, validate_email_preferences, validate_user_fields
 from src.database import get_db
+from src.config import settings
 
 router = APIRouter(prefix="/admin", dependencies=[Depends(require_admin)])
 templates = Jinja2Templates(directory="templates")
+
+
+async def mail_form(request, db, admin, values=None, error=None, status_code=200):
+    addresses = (
+        await db.scalars(
+            select(User.email).where(User.email.is_not(None), User.email != "").distinct().order_by(User.email)
+        )
+    ).all()
+    return templates.TemplateResponse(
+        request=request,
+        name="admin_mail.html",
+        context={
+            "user": admin,
+            "addresses": addresses,
+            "values": values or {},
+            "csrf_token": csrf_token(request),
+            "error": error,
+            "sent": request.session.pop("admin_mail_sent", False),
+            "mail_enabled": settings.IS_EMAILS_SEND,
+        },
+        status_code=status_code,
+    )
+
+
+@router.get("/mail")
+async def mail_page(request: Request, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    return await mail_form(request, db, admin)
+
+
+@router.post("/mail")
+async def send_admin_mail(
+    request: Request,
+    recipients: list[str] = Form(default=[]),
+    subject: str = Form(default="", max_length=200),
+    body: str = Form(default="", max_length=20000),
+    csrf: str = Form(default="", max_length=128),
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    validate_csrf(request, csrf)
+    values = {"recipients": recipients, "subject": subject, "body": body}
+    try:
+        if not settings.IS_EMAILS_SEND:
+            raise ValueError("Wysyłanie e-maili jest wyłączone w konfiguracji aplikacji.")
+        if not subject.strip() or not body.strip():
+            raise ValueError("Podaj temat i treść wiadomości.")
+        if "\r" in subject or "\n" in subject:
+            raise ValueError("Temat musi mieścić się w jednym wierszu.")
+        selected = set(recipients)
+        if not selected or len(selected) > 500:
+            raise ValueError("Wybierz od 1 do 500 adresów e-mail.")
+        available = set(
+            (await db.scalars(select(User.email).where(User.email.in_(selected)))).all()
+        )
+        if selected != available:
+            raise ValueError("Lista adresów zmieniła się. Wybierz ponownie odbiorców.")
+        addresses = sorted({validate_email_preferences(email, True) for email in selected})
+    except ValueError as error:
+        return await mail_form(request, db, admin, values, str(error), 400)
+    try:
+        await SMTPService(config=smtp_config).send_mail(
+            recipients=[],
+            bcc=addresses,
+            subject=subject.strip(),
+            body=body.strip(),
+            subtype=MessageType.plain,
+        )
+    except (SMTPException, ConnectionErrors, OSError):
+        return await mail_form(
+            request, db, admin, values,
+            "Nie udało się potwierdzić wysyłki. Sprawdź konfigurację SMTP i status dostarczenia "
+            "przed ponowieniem — część odbiorców mogła już otrzymać wiadomość.",
+            502,
+        )
+    request.session["admin_mail_sent"] = True
+    return RedirectResponse("/admin/mail", status_code=303)
 
 
 def admin_identity(admin: User) -> dict:

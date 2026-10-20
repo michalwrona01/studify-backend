@@ -4,6 +4,7 @@
 <main class="page admin-page">
   <a class="back-link" href="/">← Wróć do kalendarza</a>
   <div class="page-heading heading-row"><div><p class="eyebrow">PANEL ADMINISTRATORA</p><h1>Użytkownicy<span class="count-badge">{{ users | length }}</span></h1><p class="muted">Zarządzaj kontami i przypisaniem sekcji.</p></div><a class="button button-primary" href="/admin/users/new"><span aria-hidden="true">＋</span> Dodaj użytkownika</a></div>
+  <p><a class="button button-secondary" href="/admin/mail">Wyślij e-mail do użytkowników</a></p>
   <section class="panel table-panel" aria-label="Lista użytkowników">
     <div class="table-scroll"><table>
       <thead><tr><th scope="col">Użytkownik</th><th scope="col">E-mail</th><th scope="col">Powiadomienia</th><th scope="col">Sekcja</th><th scope="col">Rola</th><th scope="col" class="actions-cell">Akcje</th></tr></thead>

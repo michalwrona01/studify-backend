@@ -12,7 +12,7 @@
     <a class="brand" href="/" aria-label="Studify — kalendarz"><span class="brand-mark" aria-hidden="true">S</span>studify<span class="brand-dot">.</span></a>
     {% if user %}
     <nav class="account-nav" aria-label="Menu konta">
-      <a class="nav-link" href="/account">Powiadomienia</a>
+      <a class="nav-link" href="/account">Moje konto</a>
       {% if user.is_admin %}<a class="nav-link" href="/admin">Użytkownicy</a>{% endif %}
       <span class="account-name">{{ user.username }}</span>
       <form method="post" action="/logout">

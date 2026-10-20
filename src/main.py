@@ -7,6 +7,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from src.app.auth import csrf_token, router as auth_router
 from src.app.admin import router as admin_router
 from src.app.account import router as account_router
+from src.app.password_reset import router as password_reset_router
 from src.app.dependencies import get_session_user
 from src.app.models import User
 from src.app.router import router as app_router
@@ -27,7 +28,13 @@ app.add_middleware(
 @app.middleware("http")
 async def private_page_headers(request: Request, call_next):
     response = await call_next(request)
-    if request.url.path in {"/", "/login", "/logout"} or request.url.path.startswith(("/admin", "/account")):
+    if request.url.path in {
+        "/",
+        "/login",
+        "/logout",
+        "/forgot-password",
+        "/reset-password",
+    } or request.url.path.startswith(("/admin", "/account")):
         response.headers["Cache-Control"] = "no-store"
         response.headers["Referrer-Policy"] = "no-referrer"
     return response
@@ -62,6 +69,7 @@ async def home_page(
 
 app.include_router(health_check_router)
 app.include_router(auth_router)
+app.include_router(password_reset_router)
 app.include_router(admin_router)
 app.include_router(account_router)
 app.include_router(app_router)

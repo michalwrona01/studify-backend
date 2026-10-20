@@ -147,3 +147,26 @@ Wymagane są `IS_EMAILS_SEND=1` i dotychczasowa konfiguracja SMTP. Sukces oznacz
 przekazanie wiadomości serwerowi pocztowemu. Przy błędzie formularz zachowuje treść
 i wybór adresów; przed ponowieniem należy sprawdzić dostarczenie, ponieważ SMTP
 mógł już przyjąć wiadomość dla części odbiorców.
+
+## Odzyskiwanie zapomnianego hasła
+
+Na ekranie logowania wybierz **Nie pamiętasz hasła?** (`/forgot-password`) i podaj
+nazwę użytkownika. Link zostanie wysłany na adres zapisany na koncie, niezależnie
+od ustawienia powiadomień o planie. Gdy konto nie ma adresu lub użytkownik stracił
+dostęp do skrzynki, hasło musi zmienić administrator.
+
+Przed uruchomieniem nowej wersji wykonaj `poetry run alembic upgrade head`.
+Oprócz SMTP i `IS_EMAILS_SEND=1` ustaw `PUBLIC_BASE_URL` na publiczny adres aplikacji,
+np. `https://as.michalwrona.pl` (w produkcji używaj HTTPS). Linki powstają z tej
+konfiguracji, a nie z nagłówka Host żądania. Bez niej odzyskiwanie jest niedostępne.
+
+Link jest ważny przez 30 minut, działa raz i jest zastępowany przez kolejny
+zamówiony link. Baza przechowuje tylko jego skrót. Zmiana hasła, adresu e-mail
+lub wersji sesji unieważnia link. Ustawienie hasła przez link wylogowuje wszystkie
+sesje; użytkownik loguje się ponownie, a subskrypcja kalendarza pozostaje aktywna.
+Samo otwarcie linku (np. przez skaner poczty) go nie zużywa.
+
+Formularz zwraca ten sam komunikat dla kont istniejących i nieistniejących.
+Wiadomość dla jednego konta można zamówić raz na minutę. Produkcyjny reverse proxy
+powinien dodatkowo ograniczać liczbę żądań do `/forgot-password` według IP
+i nie zapisywać parametrów URL linków `/reset-password` w logach.

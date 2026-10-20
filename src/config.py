@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings
-from pydantic import Field
+from pydantic import Field, HttpUrl
 
 from vault.vault_settings import *
 
@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     IS_EMAILS_SEND: bool
     SESSION_SECRET_KEY: str = Field(min_length=32)
     SESSION_COOKIE_SECURE: bool = True
+    PUBLIC_BASE_URL: HttpUrl | None = None
 
 
 database_settings = DatabaseConfig(

@@ -614,6 +614,119 @@ class CalendarAuthorizationTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn(b"alice@example.com", wire)
         self.assertNotIn(b"bob@example.com", wire)
 
+    async def request_recovery(self, username="alice"):
+        from src.config import settings
+
+        page = await self.client.get("/forgot-password")
+        csrf = re.search(r'name="csrf" value="([^"]+)"', page.text).group(1)
+        with (
+            patch.object(settings, "IS_EMAILS_SEND", True),
+            patch.object(settings, "PUBLIC_BASE_URL", "https://studify.example"),
+            patch("src.app.password_reset.SMTPService") as smtp,
+        ):
+            smtp.return_value.send_mail = AsyncMock(return_value=True)
+            response = await self.client.post(
+                "/forgot-password", data={"csrf": csrf, "username": username},
+                headers={"host": "attacker.example"},
+            )
+            call = smtp.return_value.send_mail.await_args
+        return response, csrf, call
+
+    async def test_recovery_roundtrip_single_use_and_session_revocation(self):
+        self.users[0].email = "alice@example.com"
+        self.db.commit()
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="https://testserver") as other:
+            await self.login(client=other)
+            response, csrf, call = await self.request_recovery()
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(call.kwargs["recipients"], ["alice@example.com"])
+            self.assertNotIn("attacker.example", call.kwargs["body"])
+            token = re.search(r"https://studify.example/reset-password\?token=(\S+)", call.kwargs["body"]).group(1)
+            self.assertNotIn(token, self.users[0].password_reset_hash)
+            self.assertNotIn(token, response.text)
+            for _ in range(2):
+                page = await self.client.get("/reset-password", params={"token": token})
+                self.assertEqual(page.status_code, 200)
+                self.assertEqual(page.headers["referrer-policy"], "no-referrer")
+                self.assertEqual(page.headers["cache-control"], "no-store")
+            data = {"csrf": csrf, "token": token, "password": "recovered-password-123",
+                    "password_confirmation": "recovered-password-123"}
+            self.assertEqual((await self.client.post("/reset-password", data=data | {"csrf": ""})).status_code, 403)
+            for changes in ({"password_confirmation": "different"},
+                            {"password": "short", "password_confirmation": "short"}):
+                self.assertEqual((await self.client.post("/reset-password", data=data | changes)).status_code, 400)
+            self.assertEqual((await self.client.post("/reset-password", data=data)).status_code, 303)
+            self.assertIsNone(self.users[0].password_reset_hash)
+            self.assertTrue(verify_password(data["password"], self.users[0].password_hash))
+            self.assertTrue(verify_password(self.password, self.users[1].password_hash))
+            self.assertEqual((await other.get("/")).status_code, 303)
+            login = await self.client.get("/login")
+            self.assertIn("Hasło zostało zmienione", login.text)
+            csrf = re.search(r'name="csrf" value="([^"]+)"', login.text).group(1)
+            self.assertEqual((await self.client.post("/reset-password", data=data | {"csrf": csrf})).status_code, 400)
+            self.assertEqual((await self.login(password=data["password"])).status_code, 303)
+
+    async def test_recovery_unknown_account_no_email_and_cooldown(self):
+        unknown, _, call = await self.request_recovery("missing")
+        self.assertIsNone(call)
+        without_email, _, call = await self.request_recovery()
+        self.assertIsNone(call)
+        self.users[0].email = "alice@example.com"
+        self.db.commit()
+        known, _, call = await self.request_recovery()
+        self.assertIsNotNone(call)
+        digest = self.users[0].password_reset_hash
+        repeated, _, call = await self.request_recovery()
+        self.assertIsNone(call)
+        self.assertEqual(digest, self.users[0].password_reset_hash)
+        self.assertEqual(unknown.text, without_email.text)
+        self.assertEqual(unknown.text, known.text)
+        self.assertEqual(unknown.text, repeated.text)
+
+    async def test_recovery_invalid_expired_replaced_and_changed_account_tokens(self):
+        self.users[0].email = "alice@example.com"
+        self.db.commit()
+        _, _, call = await self.request_recovery()
+        token = re.search(r"token=(\S+)", call.kwargs["body"]).group(1)
+        for bad in ("", "bad", "9999999999." + "x" * 43, "2." + token.split(".")[1], token[:-1] + "!"):
+            self.assertEqual((await self.client.get("/reset-password", params={"token": bad})).status_code, 400)
+        original = self.users[0].password_reset_expires
+        self.users[0].password_reset_expires = 1
+        self.db.commit()
+        self.assertEqual((await self.client.get("/reset-password", params={"token": token})).status_code, 400)
+        self.users[0].password_reset_expires = original
+        for field, value in (("email", "changed@example.com"), ("password_hash", "changed"),
+                             ("session_version", 5)):
+            previous = getattr(self.users[0], field)
+            setattr(self.users[0], field, value)
+            self.db.commit()
+            self.assertEqual((await self.client.get("/reset-password", params={"token": token})).status_code, 400)
+            setattr(self.users[0], field, previous)
+            self.db.commit()
+        self.users[0].password_reset_sent_at = 1
+        self.db.commit()
+        _, _, new_call = await self.request_recovery()
+        self.assertIsNotNone(new_call)
+        self.assertEqual((await self.client.get("/reset-password", params={"token": token})).status_code, 400)
+
+    async def test_recovery_configuration_csrf_and_smtp_errors(self):
+        from src.config import settings
+        from src.app.password_reset import send_recovery_mail
+
+        page = await self.client.get("/forgot-password")
+        csrf = re.search(r'name="csrf" value="([^"]+)"', page.text).group(1)
+        data = {"username": "alice", "csrf": csrf}
+        self.assertEqual((await self.client.post("/forgot-password", data=data | {"csrf": ""})).status_code, 403)
+        for enabled, origin in ((False, "https://studify.example"), (True, None)):
+            with patch.object(settings, "IS_EMAILS_SEND", enabled), patch.object(settings, "PUBLIC_BASE_URL", origin):
+                self.assertEqual((await self.client.post("/forgot-password", data=data)).status_code, 503)
+        with patch("src.app.password_reset.SMTPService") as smtp:
+            smtp.return_value.send_mail = AsyncMock(side_effect=OSError("secret SMTP error"))
+            with self.assertLogs("src.app.password_reset", level="WARNING") as logs:
+                await send_recovery_mail("alice@example.com", "https://studify.example/reset-password?token=secret")
+            self.assertNotIn("secret", "".join(logs.output))
+            self.assertNotIn("alice@example.com", "".join(logs.output))
+
     async def test_no_mail_when_disabled_unchanged_or_no_subscribers(self):
         from src.config import settings
 

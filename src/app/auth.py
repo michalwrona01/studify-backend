@@ -32,7 +32,14 @@ def validate_csrf(request: Request, token: str) -> None:
 async def login_page(request: Request, user: User | None = Depends(get_session_user)):
     if user is not None:
         return RedirectResponse("/", status_code=303)
-    return templates.TemplateResponse(request=request, name="login.html", context={"csrf_token": csrf_token(request)})
+    return templates.TemplateResponse(
+        request=request,
+        name="login.html",
+        context={
+            "csrf_token": csrf_token(request),
+            "password_reset_done": request.session.pop("password_reset_done", False),
+        },
+    )
 
 
 @router.post("/login")

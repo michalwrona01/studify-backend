@@ -15,6 +15,9 @@ class User(BaseModel):
     session_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     email: Mapped[str | None] = mapped_column(String(254), nullable=True)
     email_notifications: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    password_reset_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    password_reset_expires: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    password_reset_sent_at: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class ScheduleFile(BaseModel):

@@ -100,7 +100,7 @@ pobraniu kalendarza.
 
 ## Adres e-mail i powiadomienia
 
-W menu **Powiadomienia** (`/account`) każdy zalogowany użytkownik może podać lub
+W menu **Moje konto** (`/account`) każdy zalogowany użytkownik może podać lub
 zmienić swój adres e-mail i zaznaczyć checkbox powiadomień o zmianach planu.
 Ustawienia dotyczą wyłącznie jego konta. Włączenie powiadomień wymaga poprawnego
 adresu e-mail; przy wyłączonych powiadomieniach adres jest opcjonalny.
@@ -121,7 +121,29 @@ Opcja `--email-notifications` włącza powiadomienia, jeśli użytkownik sobie i
 Po wykryciu zmiany pliku planu endpoint `/api/schedules/files` pobiera odbiorców
 z kont z włączonymi powiadomieniami i podanym adresem. `MAILS_TO` nie jest już
 używane. Nadal obowiązuje globalne `IS_EMAILS_SEND=1` oraz konfiguracja SMTP.
-Każdy adres otrzymuje osobny e-mail z załącznikiem; adresy innych odbiorców nie
-są ujawniane. Powtórzone adresy dostają jedną wiadomość. Przy braku odbiorców,
+Odbiorcy trafiają do ukrytej kopii BCC wspólnej wiadomości z załącznikiem;
+adresy innych odbiorców nie są ujawniane. W polu Do jest adres nadawcy `MAIL_FROM`,
+który również otrzymuje kopię. Powtórzone adresy dostają jedną wiadomość. Przy braku odbiorców,
 wyłączonej wysyłce albo braku zmiany pliku odpowiedź `is_email_sent` wynosi `false`.
 Wyłączenie powiadomień nie zmienia subskrypcji ICS.
+
+## Zmiana hasła
+
+W **Moje konto → Zmień hasło** (`/account/password`) użytkownik podaje obecne
+hasło oraz dwukrotnie nowe (12–1024 znaków). Zmiana wymaga zalogowania i poprawnego
+tokenu CSRF. Pozostałe sesje przestają działać; bieżąca sesja pozostaje zalogowana,
+a subskrypcja kalendarza działa dalej. Ta ścieżka nie wymaga poczty ani migracji bazy.
+
+## Wiadomości administratora
+
+W **Użytkownicy → Wyślij e-mail do użytkowników** (`/admin/mail`) administrator
+zaznacza zapisane adresy e-mail (do 500), wpisuje temat i treść, a następnie wysyła
+wiadomość jako zwykły tekst. Wszystkie zaznaczone adresy trafiają wyłącznie do BCC
+(UDW); pole Do zawiera `MAIL_FROM`. Powtórzone adresy na liście są scalane.
+Wysyłka ręczna jest niezależna od zgody na automatyczne powiadomienia o planie.
+Serwer sprawdza rolę administratora, CSRF i obecność adresów w bazie.
+
+Wymagane są `IS_EMAILS_SEND=1` i dotychczasowa konfiguracja SMTP. Sukces oznacza
+przekazanie wiadomości serwerowi pocztowemu. Przy błędzie formularz zachowuje treść
+i wybór adresów; przed ponowieniem należy sprawdzić dostarczenie, ponieważ SMTP
+mógł już przyjąć wiadomość dla części odbiorców.

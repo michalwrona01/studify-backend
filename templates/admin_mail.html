@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Wyślij e-mail — Studify{% endblock %}
+{% block content %}
+<main class="page form-page">
+  <a class="back-link" href="/admin">← Wróć do użytkowników</a>
+  <div class="page-heading"><p class="eyebrow">PANEL ADMINISTRATORA</p><h1>Wyślij e-mail</h1><p class="muted">Adresy odbiorców będą ukryte w BCC (UDW). Nikt nie zobaczy pozostałych adresów.</p></div>
+  <section class="panel form-panel">
+    {% if sent %}<p class="notice" role="status">Wiadomość została przekazana do serwera pocztowego.</p>{% endif %}
+    {% if error %}<p class="notice notice-error" role="alert">{{ error }}</p>{% endif %}
+    {% if not mail_enabled %}<p class="notice" role="status">Wysyłanie e-maili jest wyłączone w konfiguracji aplikacji.</p>{% endif %}
+    <form method="post" action="/admin/mail" class="stack-form">
+      <input type="hidden" name="csrf" value="{{ csrf_token }}" />
+      <fieldset class="mail-recipients">
+        <legend>Odbiorcy — ukryta kopia (maksymalnie 500 adresów)</legend>
+        <p class="field-hint">Wiadomość trafi do zaznaczonych adresów, niezależnie od ustawienia powiadomień o planie zajęć.</p>
+        {% for address in addresses %}
+        <label class="checkbox-field"><input type="checkbox" name="recipients" value="{{ address }}" {% if address in values.get('recipients', []) %}checked{% endif %} /><span>{{ address }}</span></label>
+        {% else %}<p class="muted">Brak zapisanych adresów e-mail. Uzupełnij je w ustawieniach użytkowników.</p>{% endfor %}
+      </fieldset>
+      <div><label for="subject">Temat</label><input id="subject" name="subject" maxlength="200" value="{{ values.get('subject', '') }}" required /></div>
+      <div><label for="body">Treść wiadomości</label><textarea id="body" name="body" rows="10" maxlength="20000" required>{{ values.get('body', '') }}</textarea><p class="field-hint">Wiadomość zostanie wysłana jako zwykły tekst.</p></div>
+      <div class="form-actions"><button type="submit" class="button button-primary" {% if not addresses or not mail_enabled %}disabled{% endif %}>Wyślij do zaznaczonych adresów</button></div>
+    </form>
+  </section>
+</main>
+{% endblock %}

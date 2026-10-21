@@ -486,17 +486,21 @@ class CalendarAuthorizationTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch.object(settings, "IS_EMAILS_SEND", True),
-            patch("src.app.router.ScheduleFileService.create_or_update_md5_file", new=AsyncMock(return_value=True)),
-            patch("src.app.router.SMTPService") as smtp,
+            patch("src.app.router.ScheduleService.delete_and_create_schedules", new=AsyncMock(return_value=(
+                {"2": [dict(date="2026-10-21", day="Środa", group="A", mode="online", hours="08:00-09:00",
+                            kind="Dodano", before=None, after={"name": "Anatomia"})]},
+                ("plan.xlsx", b"schedule content"),
+            ))),
+            patch("src.app.schedule_changes.SMTPService") as smtp,
         ):
             smtp.return_value.send_mail = AsyncMock(side_effect=fake_send)
             response = await self.client.post(
-                "/api/schedules/files", files={"file": ("plan.xlsx", b"schedule content")}
+                "/api/schedules", json=[]
             )
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.json()["is_email_sent"])
-        self.assertEqual(len(sent), 1)
-        self.assertEqual(sorted(sent[0][0]), ["alice@example.com", "charlie@example.com"])
+        self.assertEqual(len(sent), 2)
+        self.assertEqual(sorted(sent[0][0]), ["alice@example.com"])
+        self.assertEqual(sorted(sent[1][0]), ["alice@example.com", "charlie@example.com"])
         self.assertEqual(sent[0][1], b"schedule content")
 
     async def test_self_password_change_validates_and_revokes_other_sessions(self):
@@ -785,7 +789,7 @@ class CalendarAuthorizationTests(unittest.IsolatedAsyncioTestCase):
                 patch(
                     "src.app.router.ScheduleFileService.create_or_update_md5_file", new=AsyncMock(return_value=changed)
                 ),
-                patch("src.app.router.SMTPService") as smtp,
+                patch("src.app.schedule_changes.SMTPService") as smtp,
             ):
                 response = await self.client.post("/api/schedules/files", files={"file": ("plan.xlsx", b"schedule")})
                 self.assertEqual(response.status_code, 200)

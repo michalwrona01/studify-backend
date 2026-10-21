@@ -14,10 +14,10 @@ from icalendar import vText
 from ics import Calendar as ICSCalendar
 from ics import Event as ICSEvent
 from pydantic import EmailStr
-from sqlalchemy import delete, insert, update
+from sqlalchemy import delete, insert, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.models import Schedule, ScheduleFile
+from src.app.models import PreviousSchedule, Schedule, ScheduleFile
 from src.app.schemas import ScheduleCreate
 from src.app.models_selectors import ScheduleFileSelector
 
@@ -145,9 +145,27 @@ class ScheduleService:
 
     @staticmethod
     async def delete_and_create_schedules(schedules: List[ScheduleCreate], db: AsyncSession):
+        from src.app.schedule_changes import compare_schedules
+
         async with db.begin():
+            # Serialize imports, including the first one when the tables are empty.
+            if db.bind.dialect.name == "postgresql":
+                await db.execute(text("LOCK TABLE schedules, schedules_previous, schedules_files IN EXCLUSIVE MODE"))
+            previous = list((await db.scalars(select(Schedule))).all())
+            changes = compare_schedules(previous, schedules)
+            await db.execute(delete(PreviousSchedule))
+            fields = list(ScheduleCreate.model_fields) + ["id", "created_at", "modified_at"]
+            await db.execute(insert(PreviousSchedule).from_select(fields, select(*(getattr(Schedule, f) for f in fields))))
             await db.execute(delete(Schedule))
-            await db.execute(insert(Schedule), [s.model_dump() for s in schedules])
+            if schedules:
+                await db.execute(insert(Schedule), [s.model_dump() for s in schedules])
+            schedule_file = (await db.scalars(select(ScheduleFile).limit(1))).first()
+            attachment = None
+            if schedule_file is not None and schedule_file.content is not None:
+                attachment = (schedule_file.filename or "schedule.xls", schedule_file.content)
+                # Only the immediately following import may use this upload.
+                schedule_file.content = None
+        return changes, attachment
 
     @staticmethod
     def _prepare_data(schedules: List[Schedule]):
@@ -240,7 +258,7 @@ class ScheduleFileService:
 
     @staticmethod
     async def create_or_update_md5_file(*, file: UploadFile, db: AsyncSession) -> bool:
-        """Returns boolean whether I should send an email"""
+        """Stage the attachment for the next schedule import; report file hash changes."""
         schedule_file_selector = ScheduleFileSelector(db=db)
 
         content_file = await file.read()
@@ -248,15 +266,17 @@ class ScheduleFileService:
 
         schedule_file = await schedule_file_selector.get_last_schedule_file()
 
+        values = dict(md5_hash=md5_hash, content=content_file, filename=file.filename or "schedule.xls")
         if not schedule_file:
-            await db.execute(insert(ScheduleFile).values(md5_hash=md5_hash))
+            await db.execute(insert(ScheduleFile).values(**values))
             return True
 
-        if schedule_file and schedule_file.md5_hash != md5_hash:
-            await db.execute(update(ScheduleFile).where(ScheduleFile.id == schedule_file.id).values(md5_hash=md5_hash))
-            return True
-
-        return False
+        changed = schedule_file.md5_hash != md5_hash
+        if not changed:
+            # Preserve a pending upload, but do not resend an already consumed file.
+            values.pop("content")
+        await db.execute(update(ScheduleFile).where(ScheduleFile.id == schedule_file.id).values(**values))
+        return changed
 
 
 class SMTPService:

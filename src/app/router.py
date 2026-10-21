@@ -1,26 +1,18 @@
-from datetime import datetime
 from hashlib import md5
-from tempfile import SpooledTemporaryFile
 from typing import List
-from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Response, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from starlette.datastructures import Headers
-from starlette.templating import Jinja2Templates
 
-from src.config import settings
-from src.app.config import schedule_mail_config, smtp_config
 from src.app.dependencies import require_calendar_subscription_token
-from src.app.models import Schedule, User
+from src.app.models import Schedule
 from src.app.schemas import ScheduleCreate, ScheduleResponse
 from src.app.models_selectors import ScheduleSelector
-from src.app.services import ScheduleFileService, ScheduleService, SMTPService
+from src.app.services import ScheduleFileService, ScheduleService
 from src.database import get_db
+from src.app.schedule_changes import send_schedule_notifications
 
 router = APIRouter(prefix="/api")
-templates = Jinja2Templates(directory="templates")
 
 
 @router.post("/schedules/files")
@@ -28,65 +20,14 @@ async def schedule_file_md5_update_and_send_mail(
     file: UploadFile,
     db: AsyncSession = Depends(get_db),
 ):
-    is_send_notifications = (
-        await ScheduleFileService.create_or_update_md5_file(
-            file=file,
-            db=db,
-        )
-    )
-
-    is_email_sent = False
-
-    if is_send_notifications and settings.IS_EMAILS_SEND:
-        recipients = (
-            await db.scalars(
-                select(User.email)
-                .where(
-                    User.email_notifications.is_(True),
-                    User.email.is_not(None),
-                    User.email != "",
-                )
-                .distinct()
-            )
-        ).all()
-
-        if recipients:
-            await file.seek(0)
-
-            attachment = UploadFile(
-                file=SpooledTemporaryFile(),
-                filename=file.filename or "schedule.xls",
-                headers=Headers({
-                    "content-type": "application/vnd.ms-excel",
-                }),
-            )
-
-            try:
-                # Kopiowanie fragmentami ogranicza zużycie pamięci.
-                while chunk := await file.read(1024 * 1024):
-                    await attachment.write(chunk)
-
-                await attachment.seek(0)
-
-                smtp_client = SMTPService(config=smtp_config)
-                is_email_sent = await smtp_client.send_mail(
-                    bcc=list(recipients),
-                    subject=(
-                        f"{schedule_mail_config.MAIL_SUBJECT} - "
-                        f"{datetime.now(tz=ZoneInfo('Europe/Warsaw'))}"
-                    ),
-                    body=templates.get_template("mail.html").render(),
-                    attachments=[attachment],
-                )
-            finally:
-                await attachment.close()
-
-    return {"is_email_sent": is_email_sent}
+    changed = await ScheduleFileService.create_or_update_md5_file(file=file, db=db)
+    return {"is_email_sent": False, "is_file_changed": changed}
 
 
 @router.post("/schedules", response_model=List[ScheduleCreate])
 async def schedule_create(schedules: List[ScheduleCreate], db: AsyncSession = Depends(get_db)):
-    await ScheduleService.delete_and_create_schedules(schedules=schedules, db=db)
+    changes, attachment = await ScheduleService.delete_and_create_schedules(schedules=schedules, db=db)
+    await send_schedule_notifications(changes=changes, attachment=attachment, db=db)
     return schedules
 
 

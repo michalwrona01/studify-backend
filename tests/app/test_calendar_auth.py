@@ -499,7 +499,8 @@ class CalendarAuthorizationTests(unittest.IsolatedAsyncioTestCase):
             )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(sent), 2)
-        self.assertEqual(sorted(sent[0][0]), ["alice@example.com"])
+        from src.app.config import smtp_config
+        self.assertEqual(set(sent[0][0]), {"alice@example.com", smtp_config.MAIL_FROM})
         self.assertEqual(sorted(sent[1][0]), ["alice@example.com", "charlie@example.com"])
         self.assertEqual(sent[0][1], b"schedule content")
 
@@ -577,6 +578,29 @@ class CalendarAuthorizationTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn("przekazana do serwera", (await self.client.get("/admin/mail")).text)
             self.assertNotIn("przekazana do serwera", (await self.client.get("/admin/mail")).text)
 
+    async def test_admin_rich_mail_sanitizes_html_and_rejects_empty_content(self):
+        from src.config import settings
+        from fastapi_mail import MessageType
+
+        csrf = await self.admin_login()
+        self.users[0].email = "alice@example.com"
+        self.db.commit()
+        data = {"csrf": csrf, "subject": "Temat", "body_format": "html", "recipients": ["alice@example.com"]}
+        with patch.object(settings, "IS_EMAILS_SEND", True), patch("src.app.admin.SMTPService") as smtp:
+            smtp.return_value.send_mail = AsyncMock(return_value=True)
+            for body in ("<p><br></p>", "<div>&nbsp;</div>", "<script>alert(1)</script>"):
+                response = await self.client.post("/admin/mail", data=data | {"body": body})
+                self.assertEqual(response.status_code, 400)
+                self.assertIn('value="alice@example.com" checked', response.text)
+            smtp.return_value.send_mail.assert_not_awaited()
+            body = '<p onclick="bad()"><b>Ważne</b></p><script>bad()</script><a href="javascript:bad()">Link</a><ul><li>Termin</li></ul>'
+            response = await self.client.post("/admin/mail", data=data | {"body": body})
+            self.assertEqual(response.status_code, 303)
+            smtp.return_value.send_mail.assert_awaited_once_with(
+                recipients=[], bcc=["alice@example.com"], subject="Temat",
+                body='<p><b>Ważne</b></p><a>Link</a><ul><li>Termin</li></ul>', subtype=MessageType.html,
+            )
+
     async def test_admin_mail_disabled_and_smtp_failure(self):
         from src.config import settings
 
@@ -607,16 +631,36 @@ class CalendarAuthorizationTests(unittest.IsolatedAsyncioTestCase):
         transport.sendmail = AsyncMock(return_value=({}, "OK"))
         connection = AsyncMock()
         connection.__aenter__.return_value = SimpleNamespace(session=transport)
-        with patch("fastapi_mail.fastmail.Connection", return_value=connection):
+        with patch("src.app.services.Connection", return_value=connection):
             await SMTPService(smtp_config).send_mail(
                 recipients=[], bcc=["alice@example.com", "bob@example.com"],
                 subject="Test", body="Wiadomość", subtype=MessageType.plain,
             )
         sender, envelope, wire = transport.sendmail.await_args.args
-        self.assertEqual(set(envelope), {smtp_config.MAIL_FROM, "alice@example.com", "bob@example.com"})
+        self.assertEqual(sender, smtp_config.MAIL_FROM)
+        self.assertEqual(set(envelope), {"alice@example.com", "bob@example.com"})
         self.assertNotIn(b"Bcc:", wire)
         self.assertNotIn(b"alice@example.com", wire)
         self.assertNotIn(b"bob@example.com", wire)
+
+    async def test_direct_mail_does_not_copy_sender(self):
+        from aiosmtplib import SMTP
+        from src.app.config import smtp_config
+        from src.app.services import SMTPService
+
+        transport = SMTP()
+        transport._ehlo_or_helo_if_needed = AsyncMock()
+        transport.sendmail = AsyncMock(return_value=({}, "OK"))
+        connection = AsyncMock()
+        connection.__aenter__.return_value = SimpleNamespace(session=transport)
+        with patch("src.app.services.Connection", return_value=connection):
+            await SMTPService(smtp_config).send_mail(
+                recipients=["alice@example.com"], subject="Reset", body="Link",
+            )
+        sender, envelope, wire = transport.sendmail.await_args.args
+        self.assertEqual(sender, smtp_config.MAIL_FROM)
+        self.assertEqual(envelope, ["alice@example.com"])
+        self.assertIn(b"To: alice@example.com", wire)
 
     async def request_recovery(self, username="alice"):
         from src.config import settings

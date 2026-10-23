@@ -15,6 +15,7 @@ from src.app.auth import csrf_token, validate_csrf
 from src.app.config import smtp_config
 from src.app.dependencies import require_admin
 from src.app.models import User
+from src.app.mail_content import clean_mail_html
 from src.app.security import hash_password
 from src.app.services import SMTPService
 from src.app.user_management import available_sections, validate_email_preferences, validate_user_fields
@@ -58,12 +59,13 @@ async def send_admin_mail(
     recipients: list[str] = Form(default=[]),
     subject: str = Form(default="", max_length=200),
     body: str = Form(default="", max_length=20000),
+    body_format: str = Form(default="plain"),
     csrf: str = Form(default="", max_length=128),
     admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     validate_csrf(request, csrf)
-    values = {"recipients": recipients, "subject": subject, "body": body}
+    values = {"recipients": recipients, "subject": subject, "body": body, "body_format": body_format}
     try:
         if not settings.IS_EMAILS_SEND:
             raise ValueError("Wysyłanie e-maili jest wyłączone w konfiguracji aplikacji.")
@@ -71,6 +73,9 @@ async def send_admin_mail(
             raise ValueError("Podaj temat i treść wiadomości.")
         if "\r" in subject or "\n" in subject:
             raise ValueError("Temat musi mieścić się w jednym wierszu.")
+        if body_format not in {"plain", "html"}:
+            raise ValueError("Nieprawidłowy format wiadomości.")
+        mail_body = clean_mail_html(body) if body_format == "html" else body.strip()
         selected = set(recipients)
         if not selected or len(selected) > 500:
             raise ValueError("Wybierz od 1 do 500 adresów e-mail.")
@@ -87,8 +92,8 @@ async def send_admin_mail(
             recipients=[],
             bcc=addresses,
             subject=subject.strip(),
-            body=body.strip(),
-            subtype=MessageType.plain,
+            body=mail_body,
+            subtype=MessageType.html if body_format == "html" else MessageType.plain,
         )
     except (SMTPException, ConnectionErrors, OSError):
         return await mail_form(

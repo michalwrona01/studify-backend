@@ -2,11 +2,14 @@ import hashlib
 import os
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
+from email.utils import formataddr
 from typing import Dict, List, Optional, Union
 from zoneinfo import ZoneInfo
 
 from fastapi import UploadFile
-from fastapi_mail import ConnectionConfig, FastMail, MessageSchema, MessageType
+from fastapi_mail import ConnectionConfig, MessageSchema, MessageType
+from fastapi_mail.connection import Connection
+from fastapi_mail.msg import MailMsg
 from icalendar import Calendar as iCalendar
 from icalendar import Event as iEvent
 from icalendar import Alarm as iAlarm
@@ -281,7 +284,7 @@ class ScheduleFileService:
 
 class SMTPService:
     def __init__(self, config: ConnectionConfig):
-        self.client = FastMail(config=config)
+        self.config = config
 
     async def send_mail(
         self,
@@ -295,14 +298,23 @@ class SMTPService:
         message = MessageSchema(
             from_name="studify.",
             subject=subject,
-            # FastAPI-Mail emits an empty To header for [], which aiosmtplib
-            # interprets as an empty envelope recipient. Use our own address
-            # for To; all selected user addresses remain exclusively in BCC.
-            recipients=recipients or ([self.client.config.MAIL_FROM] if bcc else []),
+            recipients=recipients or [],
             bcc=bcc or [],
             body=body,
             subtype=subtype,
             attachments=attachments or [],
         )
-        await self.client.send_message(message)
+        envelope = list(dict.fromkeys([*message.recipients, *message.bcc]))
+        if not envelope:
+            raise ValueError("At least one mail recipient is required")
+        wire_message = await MailMsg(message)._message(formataddr(("studify.", self.config.MAIL_FROM)))
+        if not message.recipients:
+            del wire_message["To"]
+        # Explicit envelope recipients avoid interpreting an empty To header as
+        # an address and never add the sender as an implicit recipient.
+        async with Connection(self.config) as connection:
+            if not self.config.SUPPRESS_SEND:
+                await connection.session.send_message(
+                    wire_message, sender=self.config.MAIL_FROM, recipients=envelope
+                )
         return True

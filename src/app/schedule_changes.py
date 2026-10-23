@@ -121,6 +121,8 @@ async def send_schedule_notifications(*, changes, attachment, db):
             .distinct()
         )
     ).all()
+    # Changes must reach the sender even when a section has no subscribers.
+    sections = list(dict.fromkeys([*sections, *(section for section, rows in changes.items() if rows)]))
     for section in sections:
         rows = changes.get(section, [])
         recipients = (
@@ -135,6 +137,9 @@ async def send_schedule_notifications(*, changes, attachment, db):
                 .distinct()
             )
         ).all()
+        recipients = list(recipients)
+        if rows and smtp_config.MAIL_FROM.casefold() not in {email.casefold() for email in recipients}:
+            recipients.append(smtp_config.MAIL_FROM)
         if not recipients:
             continue
         upload = None
@@ -153,7 +158,7 @@ async def send_schedule_notifications(*, changes, attachment, db):
             if section:
                 subject += f" — Sekcja {section}"
             await SMTPService(config=smtp_config).send_mail(
-                bcc=list(recipients),
+                bcc=recipients,
                 subject=f"{subject} — {sent_at}",
                 body=template.render(section=section, changes=rows, has_attachment=upload is not None),
                 attachments=[upload] if upload is not None else [],

@@ -118,14 +118,45 @@ poetry run python -m scripts.create_user jan --section 1 --email jan@example.com
 Opcja `--email-notifications` włącza powiadomienia, jeśli użytkownik sobie ich
 życzy. Bez niej sam włącza je po zalogowaniu.
 
-Po wykryciu zmiany pliku planu endpoint `/api/schedules/files` pobiera odbiorców
-z kont z włączonymi powiadomieniami i podanym adresem. `MAILS_TO` nie jest już
-używane. Nadal obowiązuje globalne `IS_EMAILS_SEND=1` oraz konfiguracja SMTP.
-Odbiorcy trafiają do ukrytej kopii BCC wspólnej wiadomości z załącznikiem;
-adresy innych odbiorców nie są ujawniane. W polu Do jest adres nadawcy `MAIL_FROM`,
-który również otrzymuje kopię. Powtórzone adresy dostają jedną wiadomość. Przy braku odbiorców,
-wyłączonej wysyłce albo braku zmiany pliku odpowiedź `is_email_sent` wynosi `false`.
-Wyłączenie powiadomień nie zmienia subskrypcji ICS.
+Plan jest przechowywany w dwóch wersjach: `schedules` (bieżąca) i
+`schedules_previous` (poprzedni import). Każdy import atomowo zastępuje obie
+wersje; historia nie rośnie. Pusty import usuwa wszystkie zajęcia i powoduje
+powiadomienie o ich usunięciu.
+
+Bot najpierw przesyła plik do `/api/schedules/files`, a następnie **zawsze**
+przesyła dane do `/api/schedules`. Pierwszy endpoint tylko zapisuje załącznik
+na potrzeby najbliższego importu i zwraca `is_file_changed` oraz
+`is_email_sent=false`. Powiadomienia są wysyłane dopiero po zapisaniu danych
+przez drugi endpoint. Należy wykonywać tę parę żądań kolejno, z jednego bota,
+aby załącznik odpowiadał importowi. Import bez przesłania pliku wysyła mail bez
+załącznika. Wdrożenie wymaga migracji `poetry run alembic upgrade head` i
+aktualizacji bota razem z backendem.
+
+Każda aktualizacja pliku planu lub zmiana zajęć powoduje wysyłkę do wszystkich
+użytkowników z włączonymi powiadomieniami i adresem e-mail. Każda sekcja otrzymuje
+osobną wiadomość z tabelą zmian „Przed / Po” i plikiem planu. Przed porównaniem
+zajęcia o tej samej nazwie są łączone w bloki, jeśli następują bezpośrednio po
+sobie lub dzieli je dokładnie 5 minut przerwy — tak samo jak w kalendarzu.
+Zmiana całego bloku daje jeden wiersz tabeli. Dodane zajęcia są zielone,
+usunięte czerwone, a zmienione bursztynowe; każdy wiersz ma też etykietę tekstową. Porównanie ignoruje
+kolejność rekordów, kolejność kluczy JSON oraz generowane UID. Zmiana samego
+pliku bez zmian zajęć również wywołuje wiadomość. Sekcje bez zmian otrzymują
+pustą tabelę oraz komunikat „Brak zmian w Twojej sekcji”. Ponowny import tego
+samego pliku bez zmian zajęć nie powoduje kolejnej wysyłki. Pierwszy import do pustej bazy
+jest traktowany jako dodanie zajęć. Przesunięcie godzin zajęć o tej samej nazwie w obrębie tego samego dnia,
+sekcji, grupy i trybu daje jeden wpis „Zmieniono”, z godzinami przed i po.
+Przeniesienie na inny dzień pokazuje usunięcie starego i dodanie nowego terminu.
+
+Nadal obowiązuje `IS_EMAILS_SEND=1` oraz konfiguracja SMTP; `MAILS_TO` nie jest
+używane. Adresy odbiorców są w BCC, a pole Do jest pomijane. Nadawca `MAIL_FROM`
+otrzymuje mail dla każdej sekcji z rzeczywistymi zmianami, również gdy nie ma ona
+użytkowników lub aktywnych subskrybentów. Mail zawiera tabelę zmian i załącznik,
+jeśli do aktualizacji dołączono plik planu.
+Wiadomości o braku zmian nie są kopiowane do nadawcy.
+Powtórzone adresy w obrębie sekcji dostają jedną wiadomość. Użytkownicy bez
+przypisanej sekcji otrzymują plan, pustą tabelę i prośbę o ustawienie sekcji. Wyłączenie powiadomień
+nie zmienia subskrypcji ICS. Błąd SMTP nie cofa zapisanego planu; automatyczne
+ponawianie niedostarczonych maili nie jest obsługiwane.
 
 ## Zmiana hasła
 
@@ -137,9 +168,18 @@ a subskrypcja kalendarza działa dalej. Ta ścieżka nie wymaga poczty ani migra
 ## Wiadomości administratora
 
 W **Użytkownicy → Wyślij e-mail do użytkowników** (`/admin/mail`) administrator
-zaznacza zapisane adresy e-mail (do 500), wpisuje temat i treść, a następnie wysyła
-wiadomość jako zwykły tekst. Wszystkie zaznaczone adresy trafiają wyłącznie do BCC
-(UDW); pole Do zawiera `MAIL_FROM`. Powtórzone adresy na liście są scalane.
+zaznacza zapisane adresy e-mail (do 500), pojedynczo lub opcją „Zaznacz wszystkich”.
+Rozbudowany edytor TinyMCE ma pełne menu, czcionki, kolory, wyrównanie, listy,
+tabele, obrazy z adresów HTTP(S), znaki specjalne i emoji. Obsługuje wyszukiwanie,
+kod HTML, podgląd, licznik słów i pełny ekran. Nie wysyła plików obrazów na serwer.
+TinyMCE 8.10.0 jest serwowany lokalnie z `static/vendor/tinymce`, w trybie GPL
+(`license_key: "gpl"`), bez klucza Tiny Cloud. Licencja i źródło paczki znajdują
+się w tym katalogu; aktualizując bibliotekę, należy zachować jej plik licencji.
+Wiadomość zachowuje formatowanie HTML; serwer zachowuje dozwolone znaczniki, style tekstu i tabel oraz bezpieczne linki
+i adresy obrazów. Usuwa skrypty, zdarzenia HTML i niedozwolony CSS. Bez JavaScript formularz pozwala wysłać zwykły tekst.
+Wszystkie zaznaczone adresy trafiają wyłącznie do BCC
+(UDW); pole Do jest pomijane. Nadawca nie otrzymuje automatycznej kopii.
+Powtórzone adresy na liście są scalane.
 Wysyłka ręczna jest niezależna od zgody na automatyczne powiadomienia o planie.
 Serwer sprawdza rolę administratora, CSRF i obecność adresów w bazie.
 

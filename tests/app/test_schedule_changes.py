@@ -12,6 +12,7 @@ from starlette.datastructures import UploadFile
 from tempfile import SpooledTemporaryFile
 
 from src.app.models import PreviousSchedule, Schedule, ScheduleFile, User
+from src.app.config import smtp_config
 from src.app.schemas import ScheduleCreate
 from src.app.services import ScheduleFileService, ScheduleService
 from src.app.schedule_changes import compare_schedules, send_schedule_notifications
@@ -267,7 +268,8 @@ class ScheduleChangesTests(unittest.IsolatedAsyncioTestCase):
             )
         self.assertEqual(
             [mail[0]["bcc"] for mail in sent],
-            [["one@example.com"], ["two@example.com"], ["unchanged@example.com"], ["unassigned@example.com"]],
+            [["one@example.com", smtp_config.MAIL_FROM], ["two@example.com", smtp_config.MAIL_FROM],
+             ["unchanged@example.com"], ["unassigned@example.com"]],
         )
         self.assertIn("Brak zmian w Twojej sekcji", sent[2][0]["body"])
         self.assertIn("Liczba zmian: 0", sent[2][0]["body"])
@@ -276,6 +278,39 @@ class ScheduleChangesTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("&lt;script&gt;", sent[0][0]["body"])
         self.assertNotIn("Histologia", sent[0][0]["body"])
         self.assertIn("Tabela zmian", sent[0][0]["body"])
+
+    async def test_changed_sections_without_subscribers_notify_sender(self):
+        self.session.add(User(
+            username="disabled", password_hash="unused", calendar_token="disabled",
+            section="2", email="disabled@example.com", email_notifications=False,
+        ))
+        self.session.commit()
+        changes = compare_schedules([], [lesson("1", "Anatomia"), lesson("2", "Histologia")])
+        for attachment in (None, ("plan.xls", b"excel")):
+            with self.subTest(attachment=attachment):
+                sent = []
+
+                async def send(**kwargs):
+                    content = await kwargs["attachments"][0].read() if kwargs["attachments"] else None
+                    sent.append((kwargs, content))
+                    return True
+
+                with patch.object(settings, "IS_EMAILS_SEND", True), patch("src.app.schedule_changes.SMTPService") as smtp:
+                    smtp.return_value.send_mail = AsyncMock(side_effect=send)
+                    self.assertTrue(await send_schedule_notifications(changes=changes, attachment=attachment, db=self.db))
+                self.assertEqual(len(sent), 2)
+                for index, (mail, content) in enumerate(sent, 1):
+                    self.assertEqual(mail["bcc"], [smtp_config.MAIL_FROM])
+                    self.assertIn(f"Sekcja {index}", mail["subject"])
+                    self.assertIn("Liczba zmian: 1", mail["body"])
+                    self.assertEqual(content, b"excel" if attachment else None)
+
+    async def test_empty_changes_without_subscribers_do_not_notify_sender(self):
+        with patch.object(settings, "IS_EMAILS_SEND", True), patch("src.app.schedule_changes.SMTPService") as smtp:
+            self.assertFalse(await send_schedule_notifications(
+                changes={"1": []}, attachment=("plan.xls", b"excel"), db=self.db,
+            ))
+            smtp.assert_not_called()
 
     async def test_upload_then_import_notifies_for_new_files_but_not_duplicate_uploads(self):
         from httpx import ASGITransport, AsyncClient
@@ -340,6 +375,7 @@ class ScheduleChangesTests(unittest.IsolatedAsyncioTestCase):
                 await send_schedule_notifications(changes={}, attachment=("plan.xls", b"new file"), db=self.db)
             )
             body = smtp.return_value.send_mail.await_args.kwargs["body"]
+            self.assertEqual(smtp.return_value.send_mail.await_args.kwargs["bcc"], ["one@example.com"])
             self.assertIn("Brak zmian w Twojej sekcji", body)
             self.assertIn("Liczba zmian: 0", body)
             self.assertNotIn("<tr", body.split("<tbody>")[1].split("</tbody>")[0])

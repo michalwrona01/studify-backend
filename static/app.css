@@ -104,3 +104,10 @@ td { padding: 20px 24px; border-top: 1px solid #f0edef; font-size: 14px; }
   .page-heading { margin-top: 24px; }
 }
 @media (prefers-reduced-motion: reduce) { .button, a.calendar { transition: none; } .button:hover, a.calendar:hover { transform: none; } }
+
+/* Administrator mail composer */
+[hidden] { display: none !important; }
+
+.mail-compose-page { max-width: 1200px; }
+.mail-compose-page .tox-tinymce { width: 100%; }
+.mail-compose-page .mail-recipients { max-height: 320px; overflow-y: auto; }

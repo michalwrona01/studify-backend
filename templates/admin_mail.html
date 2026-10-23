@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Wyślij e-mail — Studify{% endblock %}
 {% block content %}
-<main class="page form-page">
+<main class="page form-page mail-compose-page">
   <a class="back-link" href="/admin">← Wróć do użytkowników</a>
   <div class="page-heading"><p class="eyebrow">PANEL ADMINISTRATORA</p><h1>Wyślij e-mail</h1><p class="muted">Adresy odbiorców będą ukryte w BCC (UDW). Nikt nie zobaczy pozostałych adresów.</p></div>
   <section class="panel form-panel">
@@ -13,14 +13,22 @@
       <fieldset class="mail-recipients">
         <legend>Odbiorcy — ukryta kopia (maksymalnie 500 adresów)</legend>
         <p class="field-hint">Wiadomość trafi do zaznaczonych adresów, niezależnie od ustawienia powiadomień o planie zajęć.</p>
+        {% if addresses %}<label class="checkbox-field" id="select-all-row" hidden><input type="checkbox" id="select-all" /><span>Zaznacz wszystkich</span></label><p id="recipient-count" class="field-hint" aria-live="polite"></p>{% endif %}
         {% for address in addresses %}
         <label class="checkbox-field"><input type="checkbox" name="recipients" value="{{ address }}" {% if address in values.get('recipients', []) %}checked{% endif %} /><span>{{ address }}</span></label>
         {% else %}<p class="muted">Brak zapisanych adresów e-mail. Uzupełnij je w ustawieniach użytkowników.</p>{% endfor %}
       </fieldset>
       <div><label for="subject">Temat</label><input id="subject" name="subject" maxlength="200" value="{{ values.get('subject', '') }}" required /></div>
-      <div><label for="body">Treść wiadomości</label><textarea id="body" name="body" rows="10" maxlength="20000" required>{{ values.get('body', '') }}</textarea><p class="field-hint">Wiadomość zostanie wysłana jako zwykły tekst.</p></div>
+      <div>
+        <label id="body-label" for="body">Treść wiadomości</label>
+        <input type="hidden" id="body-format" name="body_format" value="{{ values.get('body_format', 'plain') }}" />
+        <textarea id="body" name="body" rows="10" maxlength="20000" required>{{ values.get('body', '') }}</textarea>
+        <p id="editor-status" class="field-hint" aria-live="polite">Formatowanie zostanie zachowane w wysłanym mailu.</p>
+      </div>
       <div class="form-actions"><button type="submit" class="button button-primary" {% if not addresses or not mail_enabled %}disabled{% endif %}>Wyślij do zaznaczonych adresów</button></div>
     </form>
   </section>
 </main>
+<script src="/static/vendor/tinymce/tinymce.min.js" defer></script>
+<script src="/static/admin-mail.js" defer></script>
 {% endblock %}

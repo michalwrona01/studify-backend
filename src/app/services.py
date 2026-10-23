@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from email.utils import formataddr
 from typing import Dict, List, Optional, Union
+from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
 from fastapi import UploadFile
@@ -23,6 +24,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.app.models import PreviousSchedule, Schedule, ScheduleFile
 from src.app.schemas import ScheduleCreate
 from src.app.models_selectors import ScheduleFileSelector
+
+
+def google_maps_description(subject: Dict) -> str:
+    lat, lng = subject.get("lat"), subject.get("lng")
+    query = f"{lat},{lng}" if lat is not None and lng is not None else subject.get("location")
+    if not query:
+        return ""
+    return "Google Maps: https://www.google.com/maps/search/?" + urlencode({"api": 1, "query": query})
 
 
 class CalendarBaseService(ABC):
@@ -46,6 +55,8 @@ class ICSService(CalendarBaseService):
                 event.end = datetime.combine(subject.get("day_end"), end_time, tzinfo=ZoneInfo("Europe/Warsaw"))
                 event.name = subject.get("name", "")
                 event.uid = subject.get("uid", "")
+                if description := google_maps_description(subject):
+                    event.description = description
                 calendar.events.add(event)
 
         return calendar.serialize()
@@ -98,13 +109,16 @@ class ICalendarService(CalendarBaseService):
                 event.add("uid", uid_val)
                 # Opcjonalnie stempel czasu
                 event.add("dtstamp", datetime.now(tz))
+                if description := google_maps_description(subject):
+                    event.add("description", vText(description))
 
                 # GEO LOCATION
                 location = subject.get("location")
                 lat = subject.get("lat")
                 lng = subject.get("lng")
-                if all([location, lat, lng]):
+                if location:
                     event.add("location", vText(f"{location}"))
+                if location and lat is not None and lng is not None:
                     event.add(
                         "X-APPLE-STRUCTURED-LOCATION",
                         f"geo:{lat},{lng}",

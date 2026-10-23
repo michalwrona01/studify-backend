@@ -63,6 +63,45 @@ class ScheduleChangesTests(unittest.IsolatedAsyncioTestCase):
             row.hours["08:00-09:00"]["uid"] = "new"
         self.assertEqual(compare_schedules(old, new), {})
 
+    def test_calendar_keeps_address_without_geocoding_result(self):
+        from icalendar import Calendar
+        from src.app.services import ICalendarService
+
+        schedule = lesson(location="Szpital, ul. Długa 12", lat=None, lng=None)
+        prepared = ScheduleService._prepare_data([schedule])
+        result = ICalendarService.serialize_calendar(prepared, "inperson", "1")
+        event = Calendar.from_ical(result).walk("VEVENT")[0]
+        self.assertEqual(str(event["LOCATION"]), "Szpital, ul. Długa 12")
+        self.assertNotIn("X-APPLE-STRUCTURED-LOCATION", event)
+
+    def test_calendar_descriptions_link_to_google_maps(self):
+        from urllib.parse import parse_qs, urlsplit
+        from icalendar import Calendar
+        from src.app.services import ICalendarService, ICSService
+
+        cases = [
+            ({"location": "Szpital, ul. Długa 12", "lat": 50.1, "lng": 19.2}, "50.1,19.2"),
+            ({"location": "Szpital Łódź & Klinika, ul. Długa 12", "lat": None, "lng": None},
+             "Szpital Łódź & Klinika, ul. Długa 12"),
+            ({"location": "Szpital", "lat": 0, "lng": 0}, "0,0"),
+            ({}, None),
+        ]
+        for serializer in (ICalendarService, ICSService):
+            for location, query in cases:
+                with self.subTest(serializer=serializer.__name__, location=location):
+                    prepared = ScheduleService._prepare_data([lesson(**location)])
+                    event = Calendar.from_ical(serializer.serialize_calendar(prepared, "inperson", "1")).walk("VEVENT")[0]
+                    if query is None:
+                        self.assertNotIn("DESCRIPTION", event)
+                        continue
+                    url = str(event["DESCRIPTION"]).removeprefix("Google Maps: ")
+                    parsed = urlsplit(url)
+                    self.assertEqual((parsed.scheme, parsed.netloc, parsed.path),
+                                     ("https", "www.google.com", "/maps/search/"))
+                    self.assertEqual(parse_qs(parsed.query), {"api": ["1"], "query": [query]})
+                    if serializer is ICalendarService and location.get("lat") is not None:
+                        self.assertEqual(str(event["X-APPLE-STRUCTURED-LOCATION"]), f"geo:{query}")
+
     def test_adjacent_and_five_minute_lessons_produce_one_change(self):
         for second_start in ("09:00", "09:05"):
             old, new = lesson(), lesson(name="Histologia")

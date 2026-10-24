@@ -27,12 +27,17 @@ from src.app.schemas import ScheduleCreate
 from src.app.models_selectors import ScheduleFileSelector
 
 
-def google_maps_description(subject: Dict) -> str:
+def google_maps_url(subject: Dict) -> str:
     lat, lng = subject.get("lat"), subject.get("lng")
     query = f"{lat},{lng}" if lat is not None and lng is not None else subject.get("location")
     if not query:
         return ""
-    return "Google Maps: https://www.google.com/maps/search/?" + urlencode({"api": 1, "query": query})
+    return "https://www.google.com/maps/search/?" + urlencode({"api": 1, "query": query})
+
+
+def google_maps_description(subject: Dict) -> str:
+    url = google_maps_url(subject)
+    return f"Google Maps: {url}" if url else ""
 
 
 def calendar_event_times(hours: str, subject: Dict) -> tuple[time, time]:
@@ -48,6 +53,11 @@ def calendar_event_times(hours: str, subject: Dict) -> tuple[time, time]:
             except ValueError:
                 pass
     return tuple(datetime.strptime(value, "%H:%M").time() for value in hours.split("-"))
+
+
+def is_online_lesson(name: str) -> bool:
+    name = name.lower()
+    return "online" in name or "ginekologia i położnictwo (ix-x) dr n. med. robert kiełbasiński wykład" in name
 
 
 class CalendarBaseService(ABC):
@@ -154,10 +164,10 @@ class ICalendarService(CalendarBaseService):
                 subject_name = subject.get("name", "").lower()
                 match events_type:
                     case "inperson":
-                        if "online" not in subject_name and "Ginekologia i położnictwo (IX-X) dr n. med. Robert Kiełbasiński wykład".lower() not in subject_name:
+                        if not is_online_lesson(subject_name):
                             calendar.add_component(event)
                     case "online":
-                        if "online" in subject_name or "Ginekologia i położnictwo (IX-X) dr n. med. Robert Kiełbasiński wykład".lower() in subject_name:
+                        if is_online_lesson(subject_name):
                             calendar.add_component(event)
                     case _:
                         pass

@@ -1,4 +1,5 @@
 import os
+import json
 import re
 import secrets
 import unittest
@@ -136,6 +137,63 @@ class CalendarAuthorizationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 303)
         self.assertEqual(response.headers["location"], "/login")
         self.assertEqual(response.headers["cache-control"], "no-store")
+
+    async def test_home_calendar_includes_only_own_section_with_correct_times(self):
+        from datetime import date
+
+        self.db.add_all([
+            Schedule(section=section, date=day, day_of_week="Monday", group="A", mode="online", hours=hours)
+            for section, day, hours in [
+                ("2", date(2026, 10, 19), {
+                    "08:00-09:00": {"name": "Medycyna ONLINE godz. 17:00-18:30", "uid": "online"},
+                    "09:05-10:00": {"name": "Medycyna ONLINE godz. 17:00-18:30", "uid": "online"},
+                    "11:00-12:00": {"name": "Anatomia <script>alert(1)</script>", "location": "Sala 4"},
+                }),
+                ("1", date(2026, 10, 19), {"08:00-09:00": {"name": "Inna sekcja"}}),
+                ("2", date(2026, 10, 26), {"08:00-09:00": {"name": "Kolejny tydzień"}}),
+            ]
+        ])
+        self.db.commit()
+        await self.login()
+        page = await self.client.get("/?week=2026-10-21&section=1")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn('data-initial-date="2026-10-21"', page.text)
+        payload = re.search(r'<script id="calendar-events" type="application/json">(.*?)</script>', page.text, re.S).group(1)
+        events = json.loads(payload)
+        self.assertEqual(len(events), 3)
+        online = next(event for event in events if event["extendedProps"]["online"])
+        self.assertEqual(online["start"], "2026-10-19T17:00:00+02:00")
+        self.assertEqual(online["end"], "2026-10-19T18:30:00+02:00")
+        self.assertEqual(online["classNames"], ["lesson-online"])
+        inperson = next(event for event in events if event["title"].startswith("Anatomia"))
+        self.assertEqual(inperson["extendedProps"]["location"], "Sala 4")
+        self.assertEqual(inperson["extendedProps"]["mapsUrl"], "https://www.google.com/maps/search/?api=1&query=Sala+4")
+        self.assertEqual(online["extendedProps"]["mapsUrl"], "")
+        self.assertEqual(inperson["classNames"], ["lesson-inperson"])
+        self.assertNotIn("<script>alert(1)</script>", payload)
+        self.assertEqual(inperson["title"], "Anatomia <script>alert(1)</script>")
+        self.assertNotIn("Inna sekcja", page.text)
+        # All dates are available for client-side navigation, with DST-aware offsets.
+        winter_event = next(event for event in events if event["title"] == "Kolejny tydzień")
+        self.assertEqual(winter_event["start"], "2026-10-26T08:00:00+01:00")
+        self.assertIn('/static/vendor/fullcalendar/index.global.min.js', page.text)
+        self.assertLess(page.text.index('class="calendar-options"'), page.text.index('id="schedule-calendar"'))
+        self.assertIn('<a id="lesson-location" target="_blank" rel="noopener noreferrer">', page.text)
+
+    async def test_home_calendar_handles_empty_schedule(self):
+        await self.login()
+        page = await self.client.get("/")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn('<script id="calendar-events" type="application/json">[]</script>', page.text)
+
+    async def test_home_calendar_without_assigned_section(self):
+        self.users[0].section = None
+        self.db.commit()
+        await self.login()
+        page = await self.client.get("/")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn("Czekamy na Twoją sekcję", page.text)
+        self.assertNotIn('id="schedule-calendar"', page.text)
 
     async def test_missing_and_unknown_tokens_rejected_before_schedule_query(self):
         with patch("src.app.router.ScheduleSelector") as selector:

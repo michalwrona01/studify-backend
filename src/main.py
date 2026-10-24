@@ -1,4 +1,9 @@
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
+
 from fastapi import Depends, FastAPI, Request
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from starlette.staticfiles import StaticFiles
@@ -9,7 +14,9 @@ from src.app.admin import router as admin_router
 from src.app.account import router as account_router
 from src.app.password_reset import router as password_reset_router
 from src.app.dependencies import get_session_user
-from src.app.models import User
+from src.app.models import Schedule, User
+from src.app.services import ScheduleService, calendar_event_times, google_maps_url, is_online_lesson
+from src.database import get_db
 from src.app.router import router as app_router
 from src.config import settings
 from src.health_check.router import router as health_check_router
@@ -49,10 +56,33 @@ templates = Jinja2Templates(directory="templates")
 async def home_page(
     request: Request,
     user: User | None = Depends(get_session_user),
+    db: AsyncSession = Depends(get_db),
+    week: date | None = None,
 ):
     if user is None:
         return RedirectResponse("/login", status_code=303)
     sections = [user.section] if user.section else []
+    today = datetime.now(ZoneInfo("Europe/Warsaw")).date()
+    selected = week or today
+    events = []
+    if user.section:
+        schedules = (await db.scalars(
+            select(Schedule).where(Schedule.section == user.section).order_by(Schedule.date)
+        )).all()
+        for day in ScheduleService._prepare_data(schedules):
+            for hours, subject in day.items():
+                start, end = calendar_event_times(hours, subject)
+                online = is_online_lesson(subject["name"])
+                events.append({
+                    "title": subject["name"],
+                    "start": datetime.combine(subject["day_begin"], start, tzinfo=ZoneInfo("Europe/Warsaw")).isoformat(),
+                    "end": datetime.combine(subject["day_end"], end, tzinfo=ZoneInfo("Europe/Warsaw")).isoformat(),
+                    "classNames": ["lesson-online" if online else "lesson-inperson"],
+                    "extendedProps": {
+                        "location": subject.get("location") or "", "online": online,
+                        "mapsUrl": google_maps_url(subject),
+                    },
+                })
     return templates.TemplateResponse(
         request=request,
         name="index.html",
@@ -63,6 +93,8 @@ async def home_page(
             "username": user.username,
             "user": user,
             "csrf_token": csrf_token(request),
+            "calendar_events": events,
+            "calendar_date": selected.isoformat(),
         },
     )
 

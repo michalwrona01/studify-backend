@@ -169,6 +169,29 @@ class ScheduleChangesTests(unittest.IsolatedAsyncioTestCase):
             len(compare_schedules([], [lesson(), lesson().model_copy(update={"date": date(2026, 10, 22)})])["1"]), 2
         )
 
+    def test_email_addresses_link_to_google_maps_before_and_after_changes(self):
+        import re
+        from html import unescape
+        from urllib.parse import parse_qs, urlsplit
+        from starlette.templating import Jinja2Templates
+
+        address = 'Szpital Łódź & Klinika <A>, ul. Długa 12'
+        for coordinates, query in (({}, address), ({"lat": 50.1, "lng": 19.2}, "50.1,19.2"),
+                                   ({"lat": 0, "lng": 0}, "0,0")):
+            with self.subTest(coordinates=coordinates):
+                old = lesson(location=address, **coordinates)
+                new = lesson(name="Histologia", location=address, **coordinates)
+                rows = compare_schedules([old], [new])["1"]
+                html = Jinja2Templates(directory="templates").get_template("mail.html").render(
+                    section="1", changes=rows, has_attachment=False
+                )
+                links = re.findall(r'href="(https://www.google.com/maps/search/[^\"]+)"', html)
+                self.assertEqual(len(links), 2)
+                for link in links:
+                    self.assertEqual(parse_qs(urlsplit(unescape(link)).query), {"api": ["1"], "query": [query]})
+                self.assertIn('Szpital Łódź &amp; Klinika &lt;A&gt;', html)
+                self.assertNotIn('Klinika <A>', html)
+
     def test_email_renders_merged_block_and_all_change_colors(self):
         from starlette.templating import Jinja2Templates
 

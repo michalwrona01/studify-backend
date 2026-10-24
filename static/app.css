@@ -111,3 +111,70 @@ td { padding: 20px 24px; border-top: 1px solid #f0edef; font-size: 14px; }
 .mail-compose-page { max-width: 1200px; }
 .mail-compose-page .tox-tinymce { width: 100%; }
 .mail-compose-page .mail-recipients { max-height: 320px; overflow-y: auto; }
+
+
+/* FullCalendar, styled to match Studify. */
+.calendar-page { width: min(1500px, 100%); }
+.schedule-calendar { margin-top: 48px; padding: 28px; border-radius: 24px; }
+.calendar-intro { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 26px; }
+.calendar-legend { display: flex; gap: 18px; }
+.lesson-key { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; }
+.lesson-key::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.lesson-key.online { color: #a45e13; }
+.lesson-key.inperson { color: #3867bc; }
+.calendar-timezone { font-size: 12px; color: var(--muted); }
+.schedule-calendar .fc { --fc-border-color: #eeedf1; --fc-today-bg-color: #fff8f8; --fc-neutral-bg-color: #fafafb; --fc-page-bg-color: #fff; --fc-list-event-hover-bg-color: #f7f8fc; --fc-event-border-color: transparent; font-size: 13px; }
+.schedule-calendar .fc .fc-toolbar { gap: 16px; margin-bottom: 24px; }
+.schedule-calendar .fc .fc-toolbar-title { font-size: 22px; font-weight: 600; letter-spacing: -.5px; }
+.schedule-calendar .fc .fc-button-primary { background: white; color: #65616b; border: 1px solid #e7e5eb; padding: 9px 13px; box-shadow: none; text-transform: capitalize; font-size: 12px; font-weight: 500; }
+.schedule-calendar .fc .fc-button-primary:hover { background: #f8f6f8; color: var(--ink); }
+.schedule-calendar .fc .fc-button-primary:not(:disabled).fc-button-active { background: #29252e; color: white; border-color: #29252e; }
+.schedule-calendar .fc .fc-button-primary:focus-visible { outline: 3px solid #e85a68; outline-offset: 2px; }
+.schedule-calendar .fc .fc-button-group > .fc-button:first-child { border-radius: 9px 0 0 9px; }
+.schedule-calendar .fc .fc-button-group > .fc-button:last-child { border-radius: 0 9px 9px 0; }
+.schedule-calendar .fc .fc-today-button { border-radius: 9px; }
+.schedule-calendar .fc th { background: #fff; text-transform: none; letter-spacing: 0; padding: 0; }
+.schedule-calendar .fc td { padding: 0; font-size: inherit; }
+.schedule-calendar .fc table { white-space: normal; }
+.schedule-calendar .fc .fc-col-header-cell-cushion { padding: 16px 6px; font-weight: 500; color: #706c78; text-decoration: none; }
+.schedule-calendar .fc .fc-day-today .fc-col-header-cell-cushion { color: var(--accent); font-weight: 700; }
+.schedule-calendar .fc .fc-timegrid-slot { height: 26px; }
+.schedule-calendar .fc .fc-timegrid-slot-label-cushion { font-size: 11px; color: #8a8591; padding-right: 10px; }
+.schedule-calendar .fc .fc-timegrid-slot-minor { border-top-style: dotted; }
+.schedule-calendar .fc .fc-event { border-radius: 7px; border: 0; border-left: 3px solid; padding: 3px 5px; cursor: pointer; }
+.schedule-calendar .fc .lesson-inperson { background: #eaf0fc; border-color: #5a83cf; color: #294b85; }
+.schedule-calendar .fc .lesson-online { background: #fff1dd; border-color: #d8a04a; color: #805017; }
+.schedule-calendar .fc .fc-event-main { color: inherit; }
+.schedule-calendar .fc .fc-event-title { font-weight: 500; line-height: 1.4; }
+.schedule-calendar .fc .fc-event-time { font-weight: 700; margin-bottom: 3px; }
+.schedule-calendar .fc .fc-timegrid-event .fc-event-main { overflow: hidden; }
+.schedule-calendar .fc .fc-list-event td { padding: 14px; }
+.schedule-calendar .fc .fc-list-event-dot { border-color: #5a83cf; }
+.schedule-calendar .fc .lesson-online .fc-list-event-dot { border-color: #d8a04a; }
+.schedule-calendar .fc .fc-list-day-cushion { background: #f9f8fa; padding: 12px 14px; }
+.calendar-status { margin: 16px 0 0; color: var(--muted); font-size: 13px; }
+.subscription-heading { text-align: center; margin: 44px 0 0; }
+.lesson-dialog { width: min(520px, calc(100% - 32px)); padding: 28px; border: 1px solid var(--line); border-radius: 22px; box-shadow: 0 24px 100px #20152830; color: var(--ink); }
+.lesson-dialog::backdrop { background: #211b2b65; backdrop-filter: blur(3px); }
+.lesson-dialog-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.lesson-dialog h2 { font-size: 22px; line-height: 1.5; white-space: pre-line; overflow-wrap: anywhere; }
+.lesson-dialog p { font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
+#lesson-time { font-size: 20px; font-weight: 600; }
+@media (max-width: 1050px) {
+  .schedule-calendar .fc .fc-toolbar { flex-wrap: wrap; }
+  .schedule-calendar .fc .fc-toolbar-chunk:nth-child(2) { order: -1; width: 100%; }
+}
+@media (max-width: 680px) {
+  .schedule-calendar { padding: 16px; border-radius: 18px; }
+  .calendar-intro { align-items: flex-start; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+  .schedule-calendar .fc .fc-toolbar-title { font-size: 20px; }
+  .schedule-calendar .fc .fc-toolbar { gap: 12px; }
+  .schedule-calendar .fc .fc-button-primary { padding: 9px 10px; }
+  .schedule-calendar .fc .fc-list-event td { padding: 12px 8px; }
+  .schedule-calendar .fc .fc-list-event-time { white-space: normal; min-width: 72px; }
+  .schedule-calendar .fc .fc-list-event-title { overflow-wrap: anywhere; }
+  .schedule-calendar .fc .fc-timegrid { font-size: 10px; }
+}
+
+#lesson-location { color: #1d4ed8; text-decoration: underline; text-underline-offset: 3px; }
+#lesson-location:hover { color: #1e40af; }

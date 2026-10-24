@@ -5,9 +5,10 @@
   <div class="page-heading centered">
     <p class="eyebrow">TWÓJ PLAN ZAJĘĆ</p>
     <h1>Lekarski, semestr 9</h1>
-    <p class="muted">{% if sections %}Sekcja {{ sections[0] }}. Wybierz kalendarz i dodaj go do swojego telefonu.{% else %}Wszystko w jednym miejscu, zawsze pod ręką.{% endif %}</p>
+    <p class="muted">{% if sections %}Sekcja {{ sections[0] }} · Twoje zajęcia stacjonarne i zdalne.{% else %}Wszystko w jednym miejscu, zawsze pod ręką.{% endif %}</p>
   </div>
   {% if sections %}
+  <h2 class="subscription-heading">Dodaj plan do swojego kalendarza</h2>
   <div class="calendar-options">
     {% for kind, label, description in [('inperson', 'Zajęcia stacjonarne', 'Twój plan zajęć na uczelni.'), ('online', 'Wykłady online', 'Zajęcia zdalne w Twoim kalendarzu.')] %}
     <section class="calendar-option">
@@ -21,6 +22,28 @@
     </section>
     {% endfor %}
   </div>
+  <section class="panel schedule-calendar" aria-label="Kalendarz zajęć Twojej sekcji">
+    <div class="calendar-intro">
+      <div class="calendar-legend"><span class="lesson-key inperson">Stacjonarne</span><span class="lesson-key online">Zdalne</span></div>
+      <span class="calendar-timezone">Czas polski · Europe/Warsaw</span>
+    </div>
+    <div id="schedule-calendar" data-initial-date="{{ calendar_date }}"></div>
+    <p id="calendar-status" class="calendar-status" role="status" hidden></p>
+    <noscript><p class="notice">Włącz JavaScript, aby wyświetlić kalendarz. Możesz również skorzystać z subskrypcji powyżej.</p></noscript>
+  </section>
+  <dialog id="lesson-details" class="lesson-dialog" aria-labelledby="lesson-title">
+    <div class="lesson-dialog-top"><span id="lesson-kind" class="lesson-key"></span><button type="button" class="button button-secondary button-small" id="close-lesson" aria-label="Zamknij szczegóły zajęć">✕</button></div>
+    <h2 id="lesson-title"></h2>
+    <p id="lesson-date"></p>
+    <p id="lesson-time"></p>
+    <p><a id="lesson-location" target="_blank" rel="noopener noreferrer"></a></p>
+  </dialog>
+  <script id="calendar-events" type="application/json">{{ calendar_events | tojson }}</script>
+  <script src="/static/vendor/fullcalendar/index.global.min.js" defer></script>
+  <script src="/static/vendor/fullcalendar/pl.global.min.js" defer></script>
+  <script src="/static/vendor/fullcalendar/luxon.min.js" defer></script>
+  <script src="/static/vendor/fullcalendar/luxon3.global.min.js" defer></script>
+  <script src="/static/calendar.js" defer></script>
   {% else %}
   <div class="panel empty-state"><h2>Czekamy na Twoją sekcję</h2><p class="muted">Administrator musi przypisać Ci sekcję, zanim dodasz kalendarz.</p>{% if user.is_admin %}<a class="button button-primary" href="/admin">Przejdź do użytkowników</a>{% endif %}</div>
   {% endif %}

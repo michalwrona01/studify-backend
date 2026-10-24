@@ -11,7 +11,12 @@
     <div style="font-weight: bold; color: #0f172a; margin-bottom: 6px;">{{ value.get('name', '') }}</div>
     {% for key, detail in value.items() %}
       {% if key != 'name' and detail is not none and detail != '' %}
-        <div style="font-size: 12px; color: #475569; margin-top: 3px;">{{ {'location': 'Miejsce', 'lat': 'Szerokość geograficzna', 'lng': 'Długość geograficzna'}.get(key, key) }}: {{ detail }}</div>
+        <div style="font-size: 12px; color: #475569; margin-top: 3px;">{{ {'location': 'Miejsce', 'lat': 'Szerokość geograficzna', 'lng': 'Długość geograficzna'}.get(key, key) }}:
+          {% if key == 'location' %}
+            {% set query = (value.lat|string ~ ',' ~ value.lng|string) if value.get('lat') is not none and value.get('lng') is not none else detail %}
+            <a href="https://www.google.com/maps/search/?{{ {'api': 1, 'query': query} | urlencode }}" target="_blank" rel="noopener noreferrer" style="color: #1d4ed8; text-decoration: underline;">{{ detail }}</a>
+          {% else %}{{ detail }}{% endif %}
+        </div>
       {% endif %}
     {% endfor %}
   {% else %}<span style="color: #64748b;">Brak zajęć</span>{% endif %}

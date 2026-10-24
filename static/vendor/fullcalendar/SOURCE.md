@@ -8,3 +8,11 @@ Vendored files, served locally (no runtime CDN requests):
 - Luxon 3.7.2: https://cdn.jsdelivr.net/npm/luxon@3.7.2/build/global/luxon.min.js
 
 All are MIT licensed. Licenses are included alongside these files. Luxon handles Europe/Warsaw time independently of the browser's timezone, including daylight saving changes.
+
+## Local CSP adjustment
+
+The bundle's embedded `fcicons` TTF font has been decoded into `fcicons.ttf`.
+Its `@font-face` source in `index.global.min.js` points to
+`/static/vendor/fullcalendar/fcicons.ttf` instead of a `data:` URL, so it works
+with the application's `font-src 'self' https://fonts.gstatic.com` policy.
+When upgrading FullCalendar, repeat this extraction and URL replacement.

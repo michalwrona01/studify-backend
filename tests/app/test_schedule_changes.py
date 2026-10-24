@@ -74,6 +74,40 @@ class ScheduleChangesTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(str(event["LOCATION"]), "Szpital, ul. Długa 12")
         self.assertNotIn("X-APPLE-STRUCTURED-LOCATION", event)
 
+    def test_online_calendar_prefers_hours_in_name_after_merging_grid_blocks(self):
+        from icalendar import Calendar
+        from zoneinfo import ZoneInfo
+        from src.app.services import ICalendarService, ICSService
+
+        cases = [
+            ("Medycyna rodzinna (IX-X) dr n. med.  Żurek Marek wykład ONLINE\ngodz. 17:00-18:30", "17:00", "18:30"),
+            ("Wykład online godz. 9:00 – 10:30", "09:00", "10:30"),
+            ("Wykład Online 17:00 — 18:30", "17:00", "18:30"),
+            ("Wykład ONLINE", "08:00", "10:00"),
+            ("Wykład ONLINE godz. 25:00-26:30", "08:00", "10:00"),
+            ("Wykład ONLINE godz. 18:30-17:00", "08:00", "10:00"),
+            ("Wykład ONLINE godz. 17:00", "08:00", "10:00"),
+            ("Wykład godz. 17:00-18:30", "08:00", "10:00"),
+        ]
+        for serializer in (ICalendarService, ICSService):
+            for name, start, end in cases:
+                with self.subTest(serializer=serializer.__name__, name=name):
+                    schedule = lesson(name=name)
+                    schedule.hours["09:05-10:00"] = dict(schedule.hours["08:00-09:00"])
+                    prepared = ScheduleService._prepare_data([schedule])
+                    original = deepcopy(prepared)
+                    events_type = "online" if "online" in name.lower() else "inperson"
+                    events = Calendar.from_ical(serializer.serialize_calendar(prepared, events_type, "1")).walk("VEVENT")
+                    self.assertEqual(len(events), 1)
+                    event = events[0]
+                    for field, expected in (("DTSTART", start), ("DTEND", end)):
+                        value = event.decoded(field).astimezone(ZoneInfo("Europe/Warsaw"))
+                        self.assertEqual(value.strftime("%H:%M"), expected)
+                        self.assertEqual(value.date(), schedule.date)
+                    self.assertEqual(str(event["SUMMARY"]), name)
+                    self.assertEqual(str(event["UID"]), "random")
+                    self.assertEqual(prepared, original)
+
     def test_calendar_descriptions_link_to_google_maps(self):
         from urllib.parse import parse_qs, urlsplit
         from icalendar import Calendar

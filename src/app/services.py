@@ -1,7 +1,8 @@
 import hashlib
 import os
+import re
 from abc import ABC, abstractmethod
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from email.utils import formataddr
 from typing import Dict, List, Optional, Union
 from urllib.parse import urlencode
@@ -34,6 +35,21 @@ def google_maps_description(subject: Dict) -> str:
     return "Google Maps: https://www.google.com/maps/search/?" + urlencode({"api": 1, "query": query})
 
 
+def calendar_event_times(hours: str, subject: Dict) -> tuple[time, time]:
+    """Prefer an explicit time range in an online lesson's name over grid hours."""
+    name = subject.get("name", "")
+    if "online" in name.lower():
+        match = re.search(r"(?<![\d:])(\d{1,2}:\d{2})\s*[-–—]\s*(\d{1,2}:\d{2})(?![\d:])", name)
+        if match:
+            try:
+                start, end = (datetime.strptime(value, "%H:%M").time() for value in match.groups())
+                if start < end:
+                    return start, end
+            except ValueError:
+                pass
+    return tuple(datetime.strptime(value, "%H:%M").time() for value in hours.split("-"))
+
+
 class CalendarBaseService(ABC):
     @staticmethod
     @abstractmethod
@@ -48,9 +64,7 @@ class ICSService(CalendarBaseService):
         for day in schedules:
             for hours, subject in day.items():
                 event = ICSEvent()
-                start_time_str, end_time_str = hours.split("-")
-                start_time = datetime.strptime(start_time_str, "%H:%M").time()
-                end_time = datetime.strptime(end_time_str, "%H:%M").time()
+                start_time, end_time = calendar_event_times(hours, subject)
                 event.begin = datetime.combine(subject.get("day_begin"), start_time, tzinfo=ZoneInfo("Europe/Warsaw"))
                 event.end = datetime.combine(subject.get("day_end"), end_time, tzinfo=ZoneInfo("Europe/Warsaw"))
                 event.name = subject.get("name", "")
@@ -91,9 +105,7 @@ class ICalendarService(CalendarBaseService):
 
         for day in schedules:
             for hours, subject in day.items():
-                start_time_str, end_time_str = hours.split("-")
-                start_time = datetime.strptime(start_time_str, "%H:%M").time()
-                end_time = datetime.strptime(end_time_str, "%H:%M").time()
+                start_time, end_time = calendar_event_times(hours, subject)
 
                 dtstart = datetime.combine(subject.get("day_begin"), start_time, tzinfo=tz)
                 dtend = datetime.combine(subject.get("day_end"), end_time, tzinfo=tz)

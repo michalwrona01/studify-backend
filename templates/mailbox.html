@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Poczta — Studify{% endblock %}
+{% block content %}
+<main class="page mailbox-page">
+  <div class="page-heading heading-row"><div><p class="eyebrow">PANEL ADMINISTRATORA</p><h1>Poczta</h1><p class="muted">{{ mail_address }}</p></div><div class="row-actions"><a class="button button-secondary" href="/admin/mail">Wyślij do użytkowników</a>{% if configured %}<a class="button button-primary" href="/admin/poczta/compose">Nowa wiadomość</a>{% endif %}</div></div>
+  {% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
+  {% if error %}<p class="notice notice-error" role="alert">{{ error }}</p>{% endif %}
+  {% if not configured %}<div class="panel empty-state"><h2>Połącz skrzynkę pocztową</h2><p class="muted">Ustaw IMAP_HOST w konfiguracji serwera. Domyślnie używany jest TLS na porcie 993 oraz login i hasło SMTP.</p></div>
+  {% else %}
+  <div class="mailbox-layout">
+    <aside class="panel mailbox-folders" aria-label="Foldery pocztowe">
+      {% for item in folders %}<a href="/admin/poczta?{{ {'folder': item.name}|urlencode }}" class="mailbox-folder{% if item.name == folder %} active{% endif %}" {% if item.name == folder %}aria-current="page"{% endif %}>{{ item.label }}{% if item.name == folder %}<span>{{ unread }}</span>{% endif %}</a>{% endfor %}
+    </aside>
+    <section class="panel mailbox-list" aria-label="Lista wiadomości">
+      <form action="/admin/poczta" method="get" class="mailbox-search"><input type="hidden" name="folder" value="{{ folder }}"><label for="mail-search" class="sr-only">Szukaj w folderze</label><input id="mail-search" name="q" value="{{ q }}" maxlength="200" placeholder="Szukaj w wiadomościach…"><button class="button button-secondary button-small">Szukaj</button><a class="button button-secondary button-small" href="/admin/poczta?{{ {'folder': folder}|urlencode }}">Odśwież</a></form>
+      <div class="mailbox-count">{{ total }} wiadomości · {{ unread }} nieprzeczytanych</div>
+      {% for mail in messages %}
+      <a class="mailbox-row{% if mail.unread %} unread{% endif %}" href="/admin/poczta/message?{{ {'folder': folder, 'uid': mail.uid, 'validity': validity}|urlencode }}">
+        <span class="mailbox-sender">{% if mail.unread %}<span class="unread-dot" aria-label="Nieprzeczytana">●</span>{% endif %}{{ mail.sender }}</span><span class="mailbox-subject">{{ mail.subject }}</span><span class="mailbox-date">{{ mail.date }}</span>
+      </a>
+      {% else %}<div class="empty-state"><h2>Brak wiadomości</h2><p class="muted">{% if q %}Nie znaleziono wiadomości pasujących do wyszukiwania.{% else %}Ten folder jest pusty.{% endif %}</p></div>{% endfor %}
+      <nav class="mailbox-pagination" aria-label="Strony wiadomości">{% if page > 1 %}<a class="button button-secondary button-small" href="/admin/poczta?{{ {'folder': folder, 'q': q, 'page': page-1}|urlencode }}">← Nowsze</a>{% endif %}<span>{{ page }} / {{ pages }}</span>{% if page < pages %}<a class="button button-secondary button-small" href="/admin/poczta?{{ {'folder': folder, 'q': q, 'page': page+1}|urlencode }}">Starsze →</a>{% endif %}</nav>
+    </section>
+  </div>
+  {% endif %}
+</main>
+{% endblock %}

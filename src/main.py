@@ -11,6 +11,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from src.app.auth import csrf_token, router as auth_router
 from src.app.admin import router as admin_router
+from src.app.mailbox import router as mailbox_router
 from src.app.account import router as account_router
 from src.app.password_reset import router as password_reset_router
 from src.app.dependencies import get_session_user
@@ -103,5 +104,6 @@ app.include_router(health_check_router)
 app.include_router(auth_router)
 app.include_router(password_reset_router)
 app.include_router(admin_router)
+app.include_router(mailbox_router)
 app.include_router(account_router)
 app.include_router(app_router)

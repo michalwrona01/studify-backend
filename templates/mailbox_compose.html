@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Nowa wiadomość — Poczta{% endblock %}
+{% block content %}
+<main class="page form-page mail-compose-page">
+  <a class="back-link" href="/admin/poczta?{{ {'folder': folder}|urlencode }}">← Wróć do skrzynki</a>
+  <div class="page-heading"><p class="eyebrow">{{ mail_address }}</p><h1>{{ 'Odpowiedz' if mode == 'reply' else 'Przekaż wiadomość' if mode == 'forward' else 'Szkic' if mode == 'draft' else 'Nowa wiadomość' }}</h1></div>
+  <section class="panel form-panel">
+    {% if error %}<p class="notice notice-error" role="alert">{{ error }}</p>{% endif %}
+    {% if not mail_enabled %}<p class="notice">Wysyłanie jest wyłączone. Możesz zapisać szkic.</p>{% endif %}
+    <form action="/admin/poczta/compose" method="post" enctype="multipart/form-data" class="stack-form">
+      <input type="hidden" name="csrf" value="{{ csrf_token }}"><input type="hidden" name="folder" value="{{ folder }}"><input type="hidden" name="uid" value="{{ uid }}"><input type="hidden" name="validity" value="{{ validity }}"><input type="hidden" name="mode" value="{{ mode }}">
+      <div><label for="mail-to">Do</label><input id="mail-to" name="to" value="{{ values.get('to', '') }}" maxlength="4000" placeholder="adres@example.com"><p class="field-hint">Adresy oddziel przecinkiem. Maksymalnie 50 odbiorców łącznie.</p></div>
+      <div><label for="mail-cc">DW — kopia</label><input id="mail-cc" name="cc" value="{{ values.get('cc', '') }}" maxlength="4000"></div>
+      <div><label for="mail-bcc">UDW — ukryta kopia</label><input id="mail-bcc" name="bcc" value="{{ values.get('bcc', '') }}" maxlength="4000"></div>
+      <div><label for="mail-subject">Temat</label><input id="mail-subject" name="subject" value="{{ values.get('subject', '') }}" maxlength="200" required></div>
+      <div><label for="mail-body">Treść</label><textarea id="mail-body" name="body" rows="14" maxlength="100000" required>{{ values.get('body', '') }}</textarea></div>
+      <div><label for="mail-files">Załączniki</label><input id="mail-files" type="file" name="attachments" multiple><p class="field-hint">Do 10 plików, łącznie do 10 MB.</p></div>
+      <div class="form-actions"><button class="button button-secondary" name="operation" value="draft" formnovalidate {% if not configured %}disabled{% endif %}>Zapisz nowy szkic</button><button class="button button-primary" name="operation" value="send" {% if not mail_enabled or not configured %}disabled{% endif %}>Wyślij wiadomość</button></div>
+    </form>
+  </section>
+</main>
+{% endblock %}

@@ -225,3 +225,55 @@ kod SMTP (jeśli dostępny), errno, serwer, port, tryb TLS oraz wskazówkę dla 
 logowania, DNS, TLS, timeoutu lub odmowy połączenia. W Dockerze odczytaj go przez
 `docker logs studify-backend`. Log nie zawiera haseł, adresów odbiorców ani tokenów.
 Wysyłka działa w tle: odpowiedź formularza nie potwierdza dostarczenia wiadomości.
+
+## Skrzynka pocztowa administratora
+
+Moduł `/admin/poczta` korzysta z tej samej skrzynki i danych `MAIL_USERNAME`,
+`MAIL_PASSWORD`, `MAIL_FROM` co SMTP. Wszystkie strony, pobieranie załączników
+oraz operacje IMAP wymagają roli administratora. Formularze modyfikujące skrzynkę
+wymagają CSRF. Treści poczty nie są zapisywane w bazie aplikacji ani w logach.
+
+Dodaj do Vault `backend/app` (lub zmiennych środowiskowych):
+
+```dotenv
+IMAP_HOST=adres-twojego-serwera-imap
+IMAP_PORT=993
+IMAP_TLS_MODE=tls
+IMAP_TIMEOUT=15
+IMAP_SAVE_SENT=true
+```
+
+Dla STARTTLS użyj `IMAP_TLS_MODE=starttls` i odpowiedniego portu, zwykle 143.
+Certyfikat serwera jest weryfikowany; nie obsługujemy logowania nieszyfrowanego.
+Brak `IMAP_HOST` wyświetla komunikat konfiguracyjny i nie blokuje aplikacji.
+
+Foldery specjalne są rozpoznawane z flag IMAP SPECIAL-USE. Jeśli serwer ich nie
+udostępnia, ustaw ich **dokładne nazwy** (nie tłumaczenia interfejsu):
+`IMAP_SENT_FOLDER`, `IMAP_DRAFTS_FOLDER`, `IMAP_JUNK_FOLDER`, `IMAP_TRASH_FOLDER`.
+Jawnie wskazany brakujący folder jest tworzony przy pierwszej operacji zapisu.
+Jeśli SMTP sam zapisuje kopie wysłanych, ustaw `IMAP_SAVE_SENT=false`, aby ich
+nie powielać. Moduł zapisuje kopie wiadomości wysłanych przez nowy formularz;
+nie odtwarza wcześniejszej korespondencji ani kopii historycznych powiadomień.
+
+Lista ma po 30 wiadomości, wyszukiwanie obejmuje bieżący folder. Odczyt używa
+BODY.PEEK i nie zmienia stanu przeczytania — służą do tego przyciski w podglądzie.
+Operacje identyfikują wiadomość przez folder, UID i UIDVALIDITY, aby nie zmienić
+innej wiadomości po odtworzeniu folderu. Przenoszenie wymaga IMAP MOVE. Usuwanie
+przenosi do Kosza; moduł nie wykonuje globalnego EXPUNGE ani trwałego usuwania.
+Każdy zapis szkicu tworzy nową wersję; poprzedni szkic można przenieść do Kosza.
+Przekazywanie/otwieranie szkicu kopiuje treść; załączniki trzeba dodać ponownie.
+
+Wiadomości HTML są oczyszczane i wyświetlane w izolowanej ramce bez skryptów,
+formularzy i zewnętrznych obrazków. Załączniki są zwracane wyłącznie do pobrania.
+Podgląd wiadomości ma limit 25 MB. Wysyłanie: do 50 odbiorców, 10 załączników,
+łącznie 10 MB. Serwer SMTP może stosować niższe limity. Ustawienie
+`IS_EMAILS_SEND` nadal obowiązuje. BCC jest zachowane w prywatnej kopii IMAP,
+ale usuwane z wiadomości wysyłanej odbiorcom. Nie ponawiamy automatycznie SMTP:
+przy niejednoznacznym wyniku trzeba sprawdzić dostarczenie; błąd zapisu kopii
+po udanej wysyłce nie powoduje ponownego wysłania wiadomości.
+
+Przy wdrożeniu przebuduj backend (nowa zależność IMAPClient) i zastosuj limit
+`client_max_body_size 12m` wyłącznie dla `/admin/poczta/compose` w nginx.
+Pozostałe lokalizacje zachowują dotychczasowy limit 64 KB. Sprawdź `nginx -t`
+przed przeładowaniem. Nie są potrzebne migracje bazy. Po ustawieniu hosta sprawdź
+logowanie, nazwy folderów i TLS; test wysyłki wykonaj świadomie na własny adres.

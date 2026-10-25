@@ -1,5 +1,7 @@
 from fastapi_mail import ConnectionConfig
 from pydantic_settings import BaseSettings
+from pydantic import Field
+from typing import Literal
 
 from vault.vault_settings import *
 
@@ -13,6 +15,22 @@ smtp_config = ConnectionConfig(
     MAIL_FROM=os.getenv("MAIL_FROM"),
     USE_CREDENTIALS=bool(int(os.getenv("USE_CREDENTIALS", "1"))),
 )
+
+
+class MailboxConfig(BaseSettings):
+    IMAP_HOST: str = ""
+    IMAP_PORT: int = Field(default=993, ge=1, le=65535)
+    IMAP_TLS_MODE: Literal["tls", "starttls"] = "tls"
+    IMAP_TIMEOUT: int = Field(default=15, ge=1, le=60)
+    IMAP_SENT_FOLDER: str = ""
+    IMAP_DRAFTS_FOLDER: str = ""
+    IMAP_JUNK_FOLDER: str = ""
+    IMAP_TRASH_FOLDER: str = ""
+    # Disable if the SMTP server already saves a Sent copy automatically.
+    IMAP_SAVE_SENT: bool = True
+
+
+mailbox_config = MailboxConfig(IMAP_HOST=os.getenv("IMAP_HOST", "mail.igor251.mikr.dev"))
 
 
 class ScheduleMailConfig(BaseSettings):
